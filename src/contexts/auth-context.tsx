@@ -1,0 +1,96 @@
+'use client';
+
+import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
+import type { User, Session } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase';
+import type { UserRole } from '@/types/database';
+
+interface AuthState {
+  user: User | null;
+  session: Session | null;
+  role: UserRole | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+}
+
+interface AuthContextType extends AuthState {
+  signInWithMagicLink: (email: string, role?: UserRole) => Promise<{ error: string | null }>;
+  signOut: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const supabase = useMemo(() => createClient(), []);
+
+  const [state, setState] = useState<AuthState>({
+    user: null,
+    session: null,
+    role: null,
+    isLoading: true,
+    isAuthenticated: false,
+  });
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setState(prev => ({
+        ...prev,
+        session,
+        user: session?.user ?? null,
+        isAuthenticated: !!session,
+        isLoading: false,
+      }));
+      if (session?.user) fetchRole(session.user.id);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setState(prev => ({
+        ...prev,
+        session,
+        user: session?.user ?? null,
+        isAuthenticated: !!session,
+        isLoading: false,
+      }));
+      if (session?.user) fetchRole(session.user.id);
+      else setState(prev => ({ ...prev, role: null }));
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase]);
+
+  const fetchRole = useCallback(async (userId: string) => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', userId)
+      .single();
+    if (data) setState(prev => ({ ...prev, role: data.role as UserRole }));
+  }, [supabase]);
+
+  const signInWithMagicLink = useCallback(async (email: string, role: UserRole = 'buyer') => {
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+        data: { role },
+      },
+    });
+    return { error: error?.message ?? null };
+  }, [supabase]);
+
+  const signOut = useCallback(async () => {
+    await supabase.auth.signOut();
+  }, [supabase]);
+
+  return (
+    <AuthContext.Provider value={{ ...state, signInWithMagicLink, signOut }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
+}

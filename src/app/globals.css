@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500;600&display=swap');
+
+:root {
+  --color-bg: #0D0D0B;
+  --color-bg-soft: #141412;
+  --color-bg-muted: #1A1A17;
+  --color-border: #2A2A27;
+  --color-sand: #C8B89A;
+  --color-sand-muted: #A8956E;
+  --color-sand-light: #E8DCC8;
+  --color-text-main: #F0EDE8;
+  --color-text-muted: #A8A49E;
+  --color-text-dim: #6E6A65;
+  --color-accent-green: #4A7C59;
+  --color-accent-red: #8B3A3A;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text-main);
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden;
+}
+
+::selection {
+  background-color: var(--color-sand);
+  color: var(--color-bg);
+}
+
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+.glass {
+  background-color: rgba(20, 20, 18, 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--color-border);
+}
+
+/* Prose overrides for chat markdown */
+.prose-homey p { margin-bottom: 0.75rem; }
+.prose-homey p:last-child { margin-bottom: 0; }
+.prose-homey ul { padding-left: 1.25rem; margin-bottom: 0.75rem; }
+.prose-homey li { margin-bottom: 0.25rem; }
+.prose-homey strong { color: var(--color-text-main); font-weight: 600; }
+.prose-homey em { color: var(--color-sand-light); }
+.prose-homey h3 { font-family: 'Playfair Display', serif; font-size: 1rem; margin-bottom: 0.5rem; color: var(--color-text-main); }
