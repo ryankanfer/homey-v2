@@ -42,3 +42,4 @@ next-env.d.ts
 debug-query.mjs
 rewrite_agent.js
 seed-demo-clients.mjs
+.env*.local
