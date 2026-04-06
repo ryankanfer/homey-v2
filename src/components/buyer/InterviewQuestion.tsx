@@ -14,7 +14,7 @@ interface Option {
 
 interface InterviewQuestionProps {
   question: string;
-  options: Option[];
+  options?: Option[];
   selectedValue?: string | string[];
   onSelect: (value: string) => void;
   multiSelect?: boolean;
@@ -23,6 +23,8 @@ interface InterviewQuestionProps {
   onSayMoreChange?: (value: string) => void;
   onContinue?: () => void;
   continueDisabled?: boolean;
+  hasSelectionOverride?: boolean;
+  children?: React.ReactNode;
 }
 
 export function InterviewQuestion({
@@ -36,10 +38,14 @@ export function InterviewQuestion({
   onSayMoreChange,
   onContinue,
   continueDisabled,
+  hasSelectionOverride,
+  children,
 }: InterviewQuestionProps) {
-  const hasSelection = multiSelect
-    ? Array.isArray(selectedValue) && selectedValue.length > 0
-    : !!selectedValue;
+  const hasSelection = hasSelectionOverride !== undefined 
+    ? hasSelectionOverride 
+    : multiSelect
+      ? Array.isArray(selectedValue) && selectedValue.length > 0
+      : !!selectedValue;
 
   return (
     <div className="w-full flex flex-col">
@@ -47,8 +53,11 @@ export function InterviewQuestion({
         "{question}"
       </h2>
 
-      <div className="flex flex-col gap-3 w-full max-w-lg mx-auto">
-        {options.map((opt, i) => {
+      {children}
+
+      {options && options.length > 0 && (
+        <div className="flex flex-col gap-3 w-full max-w-lg mx-auto">
+          {options.map((opt, i) => {
           const isSelected = multiSelect
             ? Array.isArray(selectedValue) && selectedValue.includes(opt.value)
             : selectedValue === opt.value;
@@ -81,7 +90,8 @@ export function InterviewQuestion({
             </button>
           );
         })}
-      </div>
+        </div>
+      )}
 
       <AnimatePresence>
         {hasSelection && onContinue && (

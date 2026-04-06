@@ -5,11 +5,11 @@ import { useRouter } from 'next/navigation';
 import { ChevronRight } from 'lucide-react';
 import { Nav } from '@/components/buyer/Nav';
 import { AnxietyMap } from '@/components/buyer/AnxietyMap';
-import { useBuyerProfile } from '@/hooks/useBuyerProfile';
+import { useProfile } from '@/hooks/useProfile';
 
 export default function AnxietyMapPage() {
   const router = useRouter();
-  const { profile, updateProfile } = useBuyerProfile();
+  const { profile, updateProfile } = useProfile();
 
   return (
     <div className="min-h-screen bg-[#0D0D0B]">

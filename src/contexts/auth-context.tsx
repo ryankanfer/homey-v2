@@ -15,6 +15,8 @@ interface AuthState {
 
 interface AuthContextType extends AuthState {
   signInWithMagicLink: (email: string, role?: UserRole) => Promise<{ error: string | null }>;
+  sendOtp: (email: string, role?: UserRole) => Promise<{ error: string | null }>;
+  verifyOtp: (email: string, token: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -64,17 +66,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .select('role')
       .eq('id', userId)
       .single();
-    if (data) setState(prev => ({ ...prev, role: data.role as UserRole }));
+    if (data) setState(prev => ({ ...prev, role: (data as any).role as UserRole }));
   }, [supabase]);
 
   const signInWithMagicLink = useCallback(async (email: string, role: UserRole = 'buyer') => {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
         data: { role },
       },
     });
+    return { error: error?.message ?? null };
+  }, [supabase]);
+
+  const sendOtp = useCallback(async (email: string, role: UserRole = 'buyer') => {
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { data: { role } },
+    });
+    return { error: error?.message ?? null };
+  }, [supabase]);
+
+  const verifyOtp = useCallback(async (email: string, token: string) => {
+    const { error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
     return { error: error?.message ?? null };
   }, [supabase]);
 
@@ -83,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [supabase]);
 
   return (
-    <AuthContext.Provider value={{ ...state, signInWithMagicLink, signOut }}>
+    <AuthContext.Provider value={{ ...state, signInWithMagicLink, sendOtp, verifyOtp, signOut }}>
       {children}
     </AuthContext.Provider>
   );

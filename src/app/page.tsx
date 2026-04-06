@@ -18,11 +18,13 @@ export default function SplashPage() {
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.2 }}
-          className="font-serif text-5xl md:text-7xl leading-[1.1] tracking-tighter mb-8"
+          className="font-serif text-5xl md:text-7xl leading-[1.1] mb-8"
         >
-          The NYC market is designed<br />
-          to overwhelm you.<br />
-          <span className="italic text-[#C8B89A]">homey. is not.</span>
+          <span className="block mb-4 opacity-70 tracking-wide leading-tight font-light">
+            The NYC market is designed<br />
+            to overwhelm you.
+          </span>
+          <span className="italic text-[#C8B89A] tracking-tighter">homey. is not</span>
         </motion.h1>
 
         <motion.p

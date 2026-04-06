@@ -1,0 +1,268 @@
+import React, { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  X, Brain, Copy, AlertTriangle, CheckCircle2, Minus, ChevronDown, ArrowLeft, Check
+} from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import { ClientRow, ActiveProfile, ClientAIIntelligence, VaultDoc } from './types';
+import { MatchmakingDrawer } from './MatchmakingDrawer';
+import { FrictionTelemetry, synthesizeAnomalies } from './FrictionTelemetry';
+import { LiquidityDecayForecast } from './LiquidityDecayForecast';
+
+// Constants
+const BUYER_DOCS: { key: keyof VaultDoc; label: string }[] = [
+  { key: 'w2', label: 'W-2s & Tax Returns' },
+  { key: 'bank', label: 'Bank Statements' },
+  { key: 'preapproval', label: 'Pre-Approval' },
+  { key: 'rebny', label: 'REBNY Statement' },
+  { key: 'attorney', label: 'Attorney' },
+];
+
+const RENTER_DOCS: { key: keyof VaultDoc; label: string }[] = [
+  { key: 'w2', label: 'Paystubs' },
+  { key: 'bank', label: 'Bank Statements' },
+  { key: 'id', label: 'Gov. ID' },
+  { key: 'guarantor', label: 'Guarantor Docs' },
+  { key: 'landlord', label: 'Landlord Ref.' },
+];
+
+interface ClientSpotlightProps {
+  selectedClient: ClientRow;
+  activeProfile: ActiveProfile;
+  onClose: () => void;
+  vibe: string;
+  suggestedTouch: any;
+  logTouchDate: (id: string, type: string) => void;
+  intelligenceData: ClientAIIntelligence | null;
+  isGeneratingIntelligence: boolean;
+  generateIntelligence: () => void;
+  listingUrl: string;
+  setListingUrl: (url: string) => void;
+  submitListing: () => void;
+  isStreaming: boolean;
+  streamingAnalysis: string;
+  analyses: any[];
+  matchmakingMatches: { client: ClientRow; reason: string; score: number }[];
+  isMatchmakingOpen: boolean;
+  setIsMatchmakingOpen: (open: boolean) => void;
+}
+
+function ListingAccordion({ analysis }: { analysis: any }) {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <div className="border border-[#2A2A27] bg-[#141412] text-xs mb-2">
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-4 py-3 flex justify-between items-center text-[9px] uppercase tracking-widest text-[#6E6A65] hover:text-[#C8B89A] transition-colors"
+      >
+        <span className="truncate w-48 text-left">{analysis.url}</span>
+        <div className="flex items-center gap-2">
+           <span className="opacity-50">{new Date(analysis.created_at).toLocaleDateString()}</span>
+           <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        </div>
+      </button>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="p-4 border-t border-[#2A2A27] markdown-body space-y-2 max-h-64 overflow-y-auto">
+              <ReactMarkdown>{analysis.analysis_markdown}</ReactMarkdown>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+export function ClientSpotlight({
+  selectedClient, activeProfile, onClose, vibe, suggestedTouch, logTouchDate,
+  intelligenceData, isGeneratingIntelligence, generateIntelligence,
+  listingUrl, setListingUrl, submitListing, isStreaming, streamingAnalysis, analyses,
+  matchmakingMatches, isMatchmakingOpen, setIsMatchmakingOpen
+}: ClientSpotlightProps) {
+
+  // Synthesize behavioral anomalies from profile + metadata
+  const [copied, setCopied] = useState(false);
+
+  const anomalies = useMemo(
+    () => synthesizeAnomalies(selectedClient, activeProfile),
+    [selectedClient, activeProfile]
+  );
+
+  const handleComms = (type: 'email' | 'text') => {
+    logTouchDate(selectedClient.client_id, type);
+    const emailBody = `Hey! Saw a 2BR pop up that might fit your budget. Want me to send the link?`;
+    const subject = `Strategic Update regarding your ${activeProfile.kind} search`;
+
+    if (type === 'email') {
+      window.location.href = `mailto:${selectedClient.profile.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`;
+    } else {
+      navigator.clipboard.writeText(emailBody).catch(() => {});
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <motion.div
+      key="slideover"
+      initial={{ x: '100%', opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      exit={{ x: '100%', opacity: 0 }}
+      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+      className="absolute inset-0 bg-[#111110] border-l border-[#2A2A27] overflow-y-auto px-4 md:px-8 py-6 md:py-8"
+    >
+      <div className="flex items-start justify-between mb-6 md:mb-8 border-b border-[#2A2A27]/50 pb-4 md:pb-6">
+        <div className="flex items-start gap-3">
+          <button onClick={onClose} className="lg:hidden p-2 hover:bg-[#2A2A27] rounded-full transition-colors text-[#6E6A65] hover:text-[#F0EDE8] shrink-0 mt-0.5">
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h2 className="font-serif text-2xl md:text-4xl text-[#F0EDE8] mb-2">
+              {selectedClient.profile?.full_name || selectedClient.profile?.email?.split('@')[0] || 'Anonymous'}
+            </h2>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-[#A8A49E]">
+              <span>{vibe}</span>
+              <span className="hidden sm:inline">·</span>
+              <span className="opacity-70 hidden sm:inline">{selectedClient.profile?.email}</span>
+              <span>·</span>
+              <span className="uppercase tracking-widest text-[9px] font-bold px-1.5 py-0.5 border border-[#2A2A27]">{selectedClient.status}</span>
+            </div>
+          </div>
+        </div>
+        <button onClick={onClose} className="hidden lg:block p-2 hover:bg-[#2A2A27] rounded-full transition-colors text-[#6E6A65] hover:text-[#F0EDE8] shrink-0">
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-8">
+        <div className="space-y-8">
+          {/* Action Sandbox */}
+          <div className="bg-[#141412] border border-[#C8B89A]/30 p-6 rounded-sm relative overflow-hidden">
+             <div className="absolute top-0 left-0 w-1 h-full bg-[#C8B89A]" />
+             <div className="flex items-center gap-2 mb-4">
+               <Brain className="w-4 h-4 text-[#C8B89A]" />
+               <span className="text-[10px] uppercase tracking-widest text-[#C8B89A] font-bold">Suggested Action</span>
+             </div>
+             
+             <div className="flex items-center justify-between bg-[#0D0D0B] p-4 border border-[#2A2A27] rounded-sm mb-4">
+               <div>
+                 <div className="text-sm text-[#F0EDE8]">{suggestedTouch.text}</div>
+                 <div className="text-[10px] text-[#A8A49E] mt-1">Based on friction and last touch history</div>
+               </div>
+               <div className="flex gap-2">
+                  <button
+                    onClick={() => handleComms(suggestedTouch.type === 'email' ? 'email' : 'text')}
+                    className="px-3 py-1.5 bg-[#4A7C59]/10 text-[#4A7C59] border border-[#4A7C59]/30 text-[9px] uppercase tracking-widest font-bold hover:bg-[#4A7C59]/20 transition-colors flex items-center gap-1.5"
+                  >
+                    {copied && suggestedTouch.type !== 'email' ? (
+                      <><Check className="w-3 h-3" /> Copied!</>
+                    ) : (
+                      <>Log & Send {suggestedTouch.channel}</>
+                    )}
+                  </button>
+               </div>
+             </div>
+
+             <div className="text-xs text-[#A8A49E] mb-2 uppercase tracking-wide">Quick Snippets</div>
+             <div className="space-y-2">
+               <div className="p-3 bg-[#0D0D0B] border border-[#2A2A27] text-sm text-[#A8A49E] cursor-pointer hover:border-[#C8B89A] transition-colors" onClick={() => navigator.clipboard.writeText('Hey! Saw a 2BR pop up that might fit your budget. Want me to send the link?')}>
+                  Hey! Saw a 2BR pop up that might fit your budget. Want me to send the link? <Copy className="w-3 h-3 inline ml-2" />
+               </div>
+             </div>
+          </div>
+
+          <div className="space-y-4">
+             <div className="flex items-center justify-between border-b border-[#2A2A27] pb-2">
+               <h3 className="text-xs font-bold uppercase tracking-widest text-[#6E6A65]">Deep Brief</h3>
+               <button onClick={generateIntelligence} disabled={isGeneratingIntelligence} className="text-[9px] uppercase tracking-widest hover:text-[#C8B89A] transition-colors opacity-70">
+                 {isGeneratingIntelligence ? 'Synthesizing...' : 'Regenerate'}
+               </button>
+             </div>
+             {intelligenceData ? (
+                <div className="space-y-6 text-[#A8A49E]">
+                  <p className="text-sm italic leading-relaxed text-[#F0EDE8] border-l-2 border-[#C8B89A]/40 pl-4">{intelligenceData.narrative}</p>
+                </div>
+             ) : (
+                <div className="bg-[#141412] border border-[#2A2A27] p-8 text-center text-[#6E6A65]">
+                  <p className="text-xs">No synthesized brief for this client yet.</p>
+                </div>
+             )}
+          </div>
+
+          {/* Friction Telemetry — The Silent Observer */}
+          <FrictionTelemetry anomalies={anomalies} />
+        </div>
+
+        <div className="space-y-8">
+           <div>
+             <h3 className="text-[10px] font-bold uppercase tracking-widest text-[#6E6A65] border-b border-[#2A2A27] pb-2 mb-4">Profile Data</h3>
+             <div className="space-y-4 text-xs">
+                <div><span className="opacity-50 block mb-1">Budget</span> <span className="font-serif text-[#C8B89A] text-lg">{activeProfile.kind === 'renter' ? `$${activeProfile.max_monthly_rent||'—'}` : activeProfile.budget_tier}</span></div>
+                <div><span className="opacity-50 block mb-1">Territory</span> {activeProfile.territory?.join(', ') || 'Any'}</div>
+             </div>
+           </div>
+
+           <div>
+             <h3 className="text-[10px] font-bold uppercase tracking-widest text-[#6E6A65] border-b border-[#2A2A27] pb-2 mb-4">Vault Status</h3>
+             <div className="flex flex-col gap-2">
+              {(activeProfile.kind === 'buyer' ? BUYER_DOCS : RENTER_DOCS).map(doc => {
+                const ready = !!(activeProfile.vault as VaultDoc)?.[doc.key];
+                return (
+                  <div key={doc.key} className="flex justify-between items-center text-xs p-2 border border-[#2A2A27]">
+                    <span className={ready? "text-[#4A7C59]":"text-[#6E6A65]"}>{doc.label}</span>
+                    {ready ? <CheckCircle2 className="w-3.5 h-3.5 text-[#4A7C59]" /> : <Minus className="w-3.5 h-3.5 text-[#2A2A27]" />}
+                  </div>
+                )
+              })}
+             </div>
+           </div>
+
+           {/* Liquidity Decay Forecast — The Anti-Zillow */}
+           <LiquidityDecayForecast profile={activeProfile} />
+
+           <div>
+             <h3 className="text-[10px] font-bold uppercase tracking-widest text-[#6E6A65] border-b border-[#2A2A27] pb-2 mb-4">Listing Pitcher</h3>
+             <input type="url" placeholder="Paste Streeteasy URL..." value={listingUrl} onChange={e=>setListingUrl(e.target.value)} 
+               className="w-full bg-[#141412] border border-[#2A2A27] px-3 py-2 text-xs focus:border-[#C8B89A] outline-none mb-2" />
+             <button onClick={submitListing} disabled={isStreaming} className="w-full bg-[#C8B89A]/10 text-[#C8B89A] border border-[#C8B89A] py-2 text-[9px] uppercase tracking-widest font-bold hover:bg-[#C8B89A]/20 disabled:opacity-50 transition-colors mb-4">
+               {isStreaming ? 'Analyzing...' : 'Analyze Fit'}
+             </button>
+
+             {streamingAnalysis && (
+                <div className="mt-4 p-4 border border-[#A8956E] bg-[#A8956E]/5 text-xs markdown-body space-y-2">
+                  <ReactMarkdown>{streamingAnalysis}</ReactMarkdown>
+                </div>
+              )}
+              <div className="space-y-4">
+                {analyses.map((ans, i) => (
+                  <ListingAccordion key={ans.id || i} analysis={ans} />
+                ))}
+              </div>
+
+              {analyses.length > 0 && !isStreaming && (
+                <button 
+                  onClick={() => setIsMatchmakingOpen(true)}
+                  className="w-full mt-4 flex items-center justify-center gap-2 py-3 bg-[#C8B89A]/20 text-[#C8B89A] border border-[#C8B89A]/40 text-[9px] font-bold uppercase tracking-widest hover:bg-[#C8B89A]/30 transition-all rounded-sm"
+                >
+                   <Brain className="w-3.5 h-3.5" /> Match with other clients
+                </button>
+              )}
+           </div>
+        </div>
+      </div>
+
+      <MatchmakingDrawer 
+        isOpen={isMatchmakingOpen} 
+        onClose={() => setIsMatchmakingOpen(false)} 
+        matches={matchmakingMatches}
+        listingUrl={analyses[0]?.listing_url || ''}
+      />
+    </motion.div>
+  );
+}

@@ -12,11 +12,12 @@ import { Nav } from '@/components/buyer/Nav';
 import { VaultItem } from '@/components/buyer/VaultItem';
 import { CalculatorView } from '@/components/buyer/CalculatorView';
 import { MarketStat } from '@/components/buyer/MarketStat';
-import { useBuyerProfile } from '@/hooks/useBuyerProfile';
+import { ProfileEditModal } from '@/components/buyer/ProfileEditModal';
+import { useProfile } from '@/hooks/useProfile';
 import { cn } from '@/lib/utils';
 import { VAULT_UNLOCK_THRESHOLD, REALITY_CHECK_UNLOCK_THRESHOLD, AGENT_UNLOCK_THRESHOLD } from '@/lib/readiness';
-import { NEIGHBORHOOD_STATS } from '@/types/buyer';
-import type { ChatMessage } from '@/types/buyer';
+import { NEIGHBORHOOD_STATS, RENTER_NEIGHBORHOOD_STATS } from '@/types/profile';
+import type { ChatMessage } from '@/types/profile';
 
 const INITIAL_MESSAGE: ChatMessage = {
   role: 'assistant',
@@ -26,7 +27,7 @@ const INITIAL_MESSAGE: ChatMessage = {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { profile, updateProfile, readinessScore } = useBuyerProfile();
+  const { profile, updateProfile, readinessScore } = useProfile();
 
   const [activeTab, setActiveTab] = useState<'strategy' | 'vault' | 'calculator' | 'market'>('strategy');
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([INITIAL_MESSAGE]);
@@ -34,6 +35,7 @@ export default function DashboardPage() {
   const [isTyping, setIsTyping] = useState(false);
   const [showAgentConnect, setShowAgentConnect] = useState(false);
   const [showScoreInfo, setShowScoreInfo] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [selectedNeighborhood, setSelectedNeighborhood] = useState('Park Slope');
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -76,7 +78,7 @@ export default function DashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: [...chatHistory, userMsg].map(m => ({ role: m.role, content: m.content })),
-          profile: { mode: profile.mode, timeline: profile.timeline, budgetTier: profile.budgetTier, territory: profile.territory, fear: profile.fear },
+          profile: { mode: profile.mode, timeline: profile.timeline, budgetTier: profile.budgetTier, territory: profile.territory, fear: profile.fear, frictionData: profile.frictionData },
           isUrlAnalysis: isUrl,
         }),
       });
@@ -92,12 +94,23 @@ export default function DashboardPage() {
     updateProfile({ vault: { ...profile.vault, [item]: !profile.vault[item] } });
   };
 
-  const needsPivot = profile.budgetTier === 'Under $750K' &&
+  const parseBudget = (tier: string) => {
+    if (!tier) return Infinity;
+    const clean = tier.replace(/[$,]/g, '').toUpperCase();
+    if (clean.endsWith('K')) return parseFloat(clean) * 1000;
+    if (clean.endsWith('M')) return parseFloat(clean) * 1_000_000;
+    return parseFloat(clean) || Infinity;
+  };
+  const needsPivot = parseBudget(profile.budgetTier) < 750_000 &&
     (profile.territory?.includes('West Village / Greenwich') || profile.territory?.includes('Park Slope'));
+
+  const userInitials = profile.fullName ? profile.fullName.split(' ').map(n => n[0]).join('').toUpperCase() : 'U';
 
   return (
     <div className="min-h-screen bg-[#0D0D0B] flex flex-col">
-      <Nav isAuthenticated userInitials="U" />
+      <Nav isAuthenticated userInitials={userInitials} />
+
+      <ProfileEditModal isOpen={showEditModal} onClose={() => setShowEditModal(false)} />
 
       <div className="max-w-7xl mx-auto w-full px-6 py-8 grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-8">
         {/* Sidebar */}
@@ -106,11 +119,22 @@ export default function DashboardPage() {
           <div className="glass p-6 rounded-sm relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-[#C8B89A]/10 rounded-full -mr-16 -mt-16 blur-2xl" />
             <div className="flex items-center gap-4 mb-6 relative z-10">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#A8956E] to-[#C8B89A] flex items-center justify-center font-serif text-[#0D0D0B] text-xl">
-                U
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#A8956E] to-[#C8B89A] flex items-center justify-center font-serif text-[#0D0D0B] text-xl relative group">
+                {userInitials}
+                <button 
+                  onClick={() => setShowEditModal(true)}
+                  className="absolute inset-0 bg-[#0D0D0B]/60 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-full transition-opacity transition-all"
+                >
+                  <Info className="w-4 h-4 text-[#F0EDE8]" />
+                </button>
               </div>
               <div>
-                <h3 className="font-medium text-[#F0EDE8]">Buyer</h3>
+                <h3 className="font-medium text-[#F0EDE8] flex items-center gap-2">
+                  {profile.mode === 'Rent' ? 'Renter' : profile.mode === 'Buy' ? 'Buyer' : 'Strategic Profile'}
+                  <button onClick={() => setShowEditModal(true)} className="p-1 hover:bg-[#2A2A27] rounded-full transition-colors">
+                    <Info className="w-3 h-3 text-[#6E6A65]" />
+                  </button>
+                </h3>
                 <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-[#A8A49E]">
                   <span className={cn('w-1.5 h-1.5 rounded-full', profile.isPartial ? 'bg-[#6E6A65]' : 'bg-[#4A7C59] animate-pulse')} />
                   {profile.isPartial ? 'Limited Protocol' : 'Active Protocol'}
@@ -191,7 +215,11 @@ export default function DashboardPage() {
                 {profile.isPartial || readinessScore < 40 ? (
                   <>
                     <h2 className="font-serif text-3xl md:text-4xl text-[#F0EDE8] mb-3">Finish your profile.</h2>
-                    <p className="text-[#A8A49E] font-light mb-8 max-w-lg">3 questions stand between you and a clear strategy.</p>
+                    <p className="text-[#A8A49E] font-light mb-8 max-w-lg">
+                      {profile.mode === 'Rent' 
+                        ? 'We need to confirm your move-in timing and qualification status to build your roadmap.' 
+                        : '3 questions stand between you and a clear strategy.'}
+                    </p>
                     <button
                       onClick={() => router.push('/interview')}
                       className="px-6 py-4 bg-[#C8B89A] text-[#0D0D0B] font-bold text-[10px] uppercase tracking-widest hover:bg-[#E8DCC8] transition-all flex items-center gap-2"
@@ -229,9 +257,24 @@ export default function DashboardPage() {
               {/* Context cards */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {[
-                  { title: 'Why this is hard', body: `A target of ${profile.budgetTier || 'your budget'} in NYC means competing against all-cash buyers. Perfection is impossible; leverage is required.` },
-                  { title: 'What to prepare next', body: 'Do not step into an open house without a verified pre-approval and proof of liquid post-closing funds.' },
-                  { title: 'What to avoid', body: "Getting emotionally attached to a layout before validating the building's financial health." },
+                  { 
+                    title: 'Why this is hard', 
+                    body: profile.mode === 'Rent' 
+                      ? `Listing transparency is low. For your $${(profile.maxMonthlyRent || 0).toLocaleString()} budget, you're competing against hundreds of applicants for the same few clean units.`
+                      : `A target of ${profile.budgetTier || 'your budget'} in NYC means competing against all-cash buyers. Perfection is impossible; leverage is required.` 
+                  },
+                  { 
+                    title: 'What to prepare next', 
+                    body: profile.mode === 'Rent'
+                      ? 'Assemble your "Qualification Packet" (Paystubs, Reference Letters, ID) today. In this market, you have to offer within 30 minutes of the viewing.'
+                      : 'Do not step into an open house without a verified pre-approval and proof of liquid post-closing funds.' 
+                  },
+                  { 
+                    title: 'What to avoid', 
+                    body: profile.mode === 'Rent'
+                      ? "Paying a 15% broker fee for a 'no-fee' apartment in disguise. We will help you audit the management history before you sign."
+                      : "Getting emotionally attached to a layout before validating the building's financial health." 
+                  },
                 ].map(card => (
                   <div key={card.title} className="glass p-6 rounded-sm border-t border-[#2A2A27]">
                     <h4 className="text-[10px] font-bold text-[#6E6A65] uppercase tracking-widest mb-2">{card.title}</h4>
@@ -258,7 +301,7 @@ export default function DashboardPage() {
               )}
 
               {/* Chat */}
-              <section className="glass rounded-sm overflow-hidden flex flex-col h-[500px]">
+              <section className="glass rounded-sm overflow-hidden flex flex-col h-[420px] md:h-[500px]">
                 <div className="p-4 border-b border-[#2A2A27] flex items-center gap-3 bg-[#1A1A17]/50">
                   <div className="w-8 h-8 rounded-full bg-[#C8B89A]/10 border border-[#C8B89A]/20 flex items-center justify-center font-bold text-[10px] text-[#A8956E]">H</div>
                   <div>
@@ -348,20 +391,32 @@ export default function DashboardPage() {
               </div>
               <div className="glass p-8 rounded-sm">
                 <h3 className="text-sm font-bold text-[#F0EDE8] uppercase tracking-widest mb-6 flex items-center gap-3">
-                  <Briefcase className="w-5 h-5 text-[#C8B89A]" /> Document Assembly
+                  <Briefcase className="w-5 h-5 text-[#C8B89A]" /> {profile.mode === 'Rent' ? 'Rental Qualifications' : 'Document Assembly'}
                 </h3>
                 <div className="space-y-4">
-                  <VaultItem title="W-2s & Tax Returns (Last 2 Years)" desc="Essential for pre-approval and co-op boards. Redact SSNs before saving." checked={profile.vault?.w2} onToggle={() => toggleVault('w2')} />
-                  <VaultItem title="Bank & Investment Statements (Last 2 Months)" desc="Proof of funds. Must show liquid cash to cover closing costs and post-closing liquidity." checked={profile.vault?.bank} onToggle={() => toggleVault('bank')} />
-                  <VaultItem title="Mortgage Pre-Approval Letter" desc="Sellers in NYC will not look at an offer without this. Must be dated within 90 days." checked={profile.vault?.preapproval} onToggle={() => toggleVault('preapproval')} />
-                  <VaultItem title="Draft REBNY Financial Statement" desc="The standardized NYC financial disclosure. Fill this out now, not when you're rushing to offer." checked={profile.vault?.rebny} onToggle={() => toggleVault('rebny')} />
-                  <VaultItem title="Connect Real Estate Attorney" desc="Offers mean nothing until contracts are signed. Have a vetted NYC attorney on standby." checked={profile.vault?.attorney} onToggle={() => toggleVault('attorney')} />
+                  {profile.mode === 'Rent' ? (
+                    <>
+                      <VaultItem title="Recent Paystubs (Last 3)" desc="Standard income verification. Rent must be max 1/40th of annual income." checked={profile.vault?.w2} onToggle={() => toggleVault('w2')} />
+                      <VaultItem title="Bank Statements (Last 2 Months)" desc="Proof of liquidity for upfront costs (first month + security + fee)." checked={profile.vault?.bank} onToggle={() => toggleVault('bank')} />
+                      <VaultItem title="Government ID" desc="Color copy of license or passport." checked={profile.vault?.id} onToggle={() => toggleVault('id')} />
+                      <VaultItem title="Guarantor Documents" desc="If you don't meet the 40x rule, your guarantor needs to prepare their 80x docs." checked={profile.vault?.guarantor} onToggle={() => toggleVault('guarantor')} />
+                      <VaultItem title="Landlord Reference Letter" desc="Proof of good standing from your previous landlord." checked={profile.vault?.landlord} onToggle={() => toggleVault('landlord')} />
+                    </>
+                  ) : (
+                    <>
+                      <VaultItem title="W-2s & Tax Returns (Last 2 Years)" desc="Essential for pre-approval and co-op boards. Redact SSNs before saving." checked={profile.vault?.w2} onToggle={() => toggleVault('w2')} />
+                      <VaultItem title="Bank & Investment Statements (Last 2 Months)" desc="Proof of funds. Must show liquid cash to cover closing costs and post-closing liquidity." checked={profile.vault?.bank} onToggle={() => toggleVault('bank')} />
+                      <VaultItem title="Mortgage Pre-Approval Letter" desc="Sellers in NYC will not look at an offer without this. Must be dated within 90 days." checked={profile.vault?.preapproval} onToggle={() => toggleVault('preapproval')} />
+                      <VaultItem title="Draft REBNY Financial Statement" desc="The standardized NYC financial disclosure. Fill this out now, not when you're rushing to offer." checked={profile.vault?.rebny} onToggle={() => toggleVault('rebny')} />
+                      <VaultItem title="Connect Real Estate Attorney" desc="Offers mean nothing until contracts are signed. Have a vetted NYC attorney on standby." checked={profile.vault?.attorney} onToggle={() => toggleVault('attorney')} />
+                    </>
+                  )}
                 </div>
               </div>
             </motion.div>
           )}
 
-          {activeTab === 'calculator' && <CalculatorView budgetTier={profile.budgetTier} />}
+          {activeTab === 'calculator' && <CalculatorView mode={profile.mode} budgetTier={profile.budgetTier} maxMonthlyRent={profile.maxMonthlyRent} />}
 
           {activeTab === 'market' && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
@@ -376,7 +431,7 @@ export default function DashboardPage() {
                 <div className="flex flex-wrap justify-between items-center gap-4 mb-8">
                   <h3 className="text-[10px] text-[#6E6A65] font-bold uppercase tracking-widest">Neighborhood Pulse</h3>
                   <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                    {Object.keys(NEIGHBORHOOD_STATS).map(nbhd => (
+                    {Object.keys(profile.mode === 'Rent' ? RENTER_NEIGHBORHOOD_STATS : NEIGHBORHOOD_STATS).map(nbhd => (
                       <button
                         key={nbhd}
                         onClick={() => setSelectedNeighborhood(nbhd)}
@@ -391,14 +446,24 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                  <MarketStat label="Median Sale Price" value={`$${(NEIGHBORHOOD_STATS[selectedNeighborhood].median / 1000000).toFixed(2)}M`} delta="↑ 4.2% YoY" up />
-                  <MarketStat label="Avg. Days on Market" value={NEIGHBORHOOD_STATS[selectedNeighborhood].dom} delta="↓ 8 days vs Q1" />
-                  <MarketStat label="Sale-to-List Ratio" value={NEIGHBORHOOD_STATS[selectedNeighborhood].ratio} delta="↑ bidding activity" up />
+                  {profile.mode === 'Rent' ? (
+                    <>
+                      <MarketStat label="Median Rent" value={`$${RENTER_NEIGHBORHOOD_STATS[selectedNeighborhood]?.medianRent?.toLocaleString() || '-'}`} delta="↑ 2.1% YoY" up />
+                      <MarketStat label="Avg. Days on Market" value={RENTER_NEIGHBORHOOD_STATS[selectedNeighborhood]?.dom || '-'} delta="↓ 4 days vs Q1" />
+                      <MarketStat label="Concessions" value={RENTER_NEIGHBORHOOD_STATS[selectedNeighborhood]?.concessions || '-'} delta="Tight market" />
+                    </>
+                  ) : (
+                    <>
+                      <MarketStat label="Median Sale Price" value={`$${((NEIGHBORHOOD_STATS[selectedNeighborhood]?.median || 1) / 1000000).toFixed(2)}M`} delta="↑ 4.2% YoY" up />
+                      <MarketStat label="Avg. Days on Market" value={NEIGHBORHOOD_STATS[selectedNeighborhood]?.dom || '-'} delta="↓ 8 days vs Q1" />
+                      <MarketStat label="Sale-to-List Ratio" value={NEIGHBORHOOD_STATS[selectedNeighborhood]?.ratio || '-'} delta="↑ bidding activity" up />
+                    </>
+                  )}
                 </div>
                 <div className="border-l-2 border-[#A8956E] pl-6 py-2">
                   <div className="text-[10px] text-[#A8956E] font-bold uppercase tracking-widest mb-2">OS Translation</div>
                   <p className="text-[#F0EDE8] font-light leading-relaxed italic">
-                    "{NEIGHBORHOOD_STATS[selectedNeighborhood].insight}"
+                    "{profile.mode === 'Rent' ? RENTER_NEIGHBORHOOD_STATS[selectedNeighborhood]?.insight : NEIGHBORHOOD_STATS[selectedNeighborhood]?.insight}"
                   </p>
                 </div>
               </div>
