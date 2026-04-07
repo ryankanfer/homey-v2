@@ -24,7 +24,7 @@ interface VaultIntelligenceProps {
 export function VaultIntelligence({ userId }: VaultIntelligenceProps) {
   const [docs, setDocs] = useState<UserDoc[]>([]);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
+  const supabase = createClient() as any;
 
   useEffect(() => {
     fetchDocs();
@@ -49,7 +49,7 @@ export function VaultIntelligence({ userId }: VaultIntelligenceProps) {
 
   const fetchDocs = async () => {
     const { data } = await supabase
-      .from('user_documents' as any)
+      .from('user_documents')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
@@ -59,9 +59,9 @@ export function VaultIntelligence({ userId }: VaultIntelligenceProps) {
   };
 
   const toggleAccess = async (docId: string, current: boolean) => {
-    await (supabase
-      .from('user_documents' as any)
-      .update({ agent_access_granted: !current } as any) as any)
+    await supabase
+      .from('user_documents')
+      .update({ agent_access_granted: !current })
       .eq('id', docId);
   };
 

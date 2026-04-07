@@ -52,20 +52,22 @@ const EXTRACTION_TOOLS: Anthropic.Tool[] = [
 export async function POST(req: Request) {
   try {
     const { documentId } = await req.json();
-    const supabase = await createServerSupabaseClient();
+    const supabase = (await createServerSupabaseClient()) as any;
     
     // 1. Fetch document metadata
-    const { data: doc, error: docErr } = await supabase
-      .from('user_documents' as any)
+    const docResponse = await supabase
+      .from('user_documents')
       .select('*')
       .eq('id', documentId)
       .single();
 
-    if (docErr || !doc) return NextResponse.json({ error: 'Document not found' }, { status: 404 });
+    if (docResponse.error || !docResponse.data) return NextResponse.json({ error: 'Document not found' }, { status: 404 });
+    const doc = docResponse.data;
+    
     if (doc.status === 'processed') return NextResponse.json({ message: 'Already processed' });
 
     // Update status to processing
-    await supabase.from('user_documents' as any).update({ status: 'processing' }).eq('id', documentId);
+    await supabase.from('user_documents').update({ status: 'processing' }).eq('id', documentId);
 
     // 2. Download from Storage
     const { data: fileData, error: downloadErr } = await supabase.storage
@@ -119,22 +121,22 @@ export async function POST(req: Request) {
     const textResp = response.content.find((c): c is Anthropic.TextBlock => c.type === 'text');
     
     if (!toolUse) {
-       await supabase.from('user_documents' as any).update({ status: 'error' } as any).eq('id', documentId);
+       await supabase.from('user_documents').update({ status: 'error' }).eq('id', documentId);
        return NextResponse.json({ error: 'AI failed to classify document' }, { status: 422 });
     }
 
-    const category = toolUse.name.replace('extract_', '').replace('_data', '');
+    const category = toolUse.name.replace('extract_', '').replace('_data', '') as any;
     const extractedData = toolUse.input;
     const signalSummary = textResp?.text || `Verified ${category} document.`;
 
     // 5. Save Intelligence
-    await supabase.from('document_intelligence' as any).insert({
+    await supabase.from('document_intelligence').insert({
       document_id: documentId,
       user_id: doc.user_id,
       category,
-      extracted_data: extractedData,
+      extracted_data: extractedData as any,
       signal_summary: signalSummary
-    } as any);
+    });
 
     // 6. Update Vault Bits (No Demotion Rule)
     const vaultMap: Record<string, string> = {
@@ -144,7 +146,7 @@ export async function POST(req: Request) {
       tax_return: 'rebny' // Closest match for generic tax info
     };
 
-    const vaultKey = vaultMap[category];
+    const vaultKey = vaultMap[category as string];
     if (vaultKey) {
       const { data: profile } = await supabase.from('buyer_profiles').select('vault').eq('user_id', doc.user_id).single();
       if (profile) {
@@ -158,7 +160,7 @@ export async function POST(req: Request) {
     }
 
     // Final status update
-    await supabase.from('user_documents' as any).update({ status: 'processed' }).eq('id', documentId);
+    await supabase.from('user_documents').update({ status: 'processed' }).eq('id', documentId);
 
     return NextResponse.json({ success: true, category, extractedData });
 
