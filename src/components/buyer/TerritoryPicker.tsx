@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronRight, MapPin, ArrowRight, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, MapPin, ArrowRight, ArrowLeft, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { NYC_BOROUGHS, type MicroNeighborhood, type Borough } from '@/data/neighborhoods';
 
@@ -10,9 +10,10 @@ interface TerritoryPickerProps {
   territory: string[];
   onUpdate: (territory: string[]) => void;
   onContinue: () => void;
+  onBack?: () => void;
 }
 
-export function TerritoryPicker({ territory, onUpdate, onContinue }: TerritoryPickerProps) {
+export function TerritoryPicker({ territory, onUpdate, onContinue, onBack }: TerritoryPickerProps) {
   const [expandedBorough, setExpandedBorough] = useState<string | null>(null);
   const [expandedSubMarket, setExpandedSubMarket] = useState<string | null>(null);
 
@@ -75,6 +76,14 @@ export function TerritoryPicker({ territory, onUpdate, onContinue }: TerritoryPi
           {selectedCount > 0 ? `Continue with ${selectedCount} micro${selectedCount > 1 ? 's' : ''}` : 'Select at least one area'}
           <ArrowRight className="w-4 h-4" />
         </button>
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="mt-3 w-full max-w-lg py-3 text-[#6E6A65] hover:text-[#F0EDE8] font-bold text-[10px] uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
+          >
+            <ArrowLeft className="w-3 h-3" /> Back
+          </button>
+        )}
       </div>
 
       <style jsx global>{`

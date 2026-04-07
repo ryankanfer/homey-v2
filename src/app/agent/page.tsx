@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { AnimatePresence } from 'framer-motion';
-import { Search, Brain, Copy, ShieldAlert, Mail } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Search, Brain, Copy, ShieldAlert } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
@@ -120,7 +120,7 @@ export default function AgentDashboard() {
 
   const [toasts, setToasts] = useState<{id: string, message: string}[]>([]);
   const addToast = (message: string) => {
-    const id = Math.random().toString(36).substr(2, 9);
+    const id = Math.random().toString(36).substring(2, 11);
     setToasts(prev => [...prev, { id, message }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000);
   };
@@ -166,15 +166,19 @@ export default function AgentDashboard() {
       setClients(rows);
       setLoadingClients(false);
 
-      buyerChannelRef.current = supabase
-        .channel('buyer_profile_changes')
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'buyer_profiles', filter: `user_id=in.(${clientIds.join(',')})` }, () => load())
-        .subscribe();
-      
-      renterChannelRef.current = supabase
-        .channel('renter_profile_changes')
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'renter_profiles', filter: `user_id=in.(${clientIds.join(',')})` }, () => load())
-        .subscribe();
+      if (!buyerChannelRef.current) {
+        buyerChannelRef.current = supabase
+          .channel('buyer_profile_changes')
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'buyer_profiles', filter: `user_id=in.(${clientIds.join(',')})` }, () => load())
+          .subscribe();
+      }
+
+      if (!renterChannelRef.current) {
+        renterChannelRef.current = supabase
+          .channel('renter_profile_changes')
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'renter_profiles', filter: `user_id=in.(${clientIds.join(',')})` }, () => load())
+          .subscribe();
+      }
     };
     load();
     const agentChannel = supabase.channel('agent_clients_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'agent_clients', filter: `agent_id=eq.${user.id}` }, load).subscribe();
@@ -427,16 +431,25 @@ export default function AgentDashboard() {
       <div className="fixed bottom-4 right-4 z-[999] flex flex-col gap-2 pointer-events-none">
         <AnimatePresence>
           {toasts.map(t => (
-            <div key={t.id} className="bg-[#141412] border border-[#C8B89A] px-4 py-2 text-[10px] uppercase tracking-widest text-[#C8B89A] shadow-xl pointer-events-auto">
+            <motion.div
+              key={t.id}
+              initial={{ opacity: 0, y: 8, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 4, scale: 0.97 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              role="status"
+              aria-live="polite"
+              className="bg-[#141412] border border-[#C8B89A] px-4 py-2 text-[10px] uppercase tracking-widest text-[#C8B89A] shadow-xl pointer-events-auto"
+            >
               {t.message}
-            </div>
+            </motion.div>
           ))}
         </AnimatePresence>
       </div>
 
       <div className="flex flex-col border-b border-[#2A2A27] bg-[#0D0D0B]/80 backdrop-blur-lg sticky top-0 z-40">
         <nav className="flex items-center justify-between px-6 py-4">
-          <span className="font-serif italic text-2xl text-[#C8B89A] tracking-tighter">homey. advsr</span>
+          <span className="font-serif italic text-2xl text-[#C8B89A] tracking-tighter">homey.advsr</span>
           <div className="flex items-center gap-4">
             <button
               onClick={() => { navigator.clipboard.writeText(shareLink); addToast('Client Link Copied!'); }}
@@ -497,9 +510,36 @@ export default function AgentDashboard() {
               />
             )}
             {!selectedClient && (
-              <div className="hidden lg:flex items-center justify-center flex-col opacity-30 pointer-events-none">
-                <ShieldAlert className="w-24 h-24 mb-6 stroke-1 text-[#6E6A65]" />
-                <p className="text-[#F0EDE8] uppercase tracking-widest text-xs font-bold">Awaiting Selection</p>
+              <div className="hidden lg:flex items-center justify-center flex-1">
+                {!loadingClients && clients.length === 0 ? (
+                  // First-run empty state — no clients yet
+                  <div className="max-w-sm text-center space-y-8 px-6">
+                    <div className="w-16 h-16 mx-auto border border-[#2A2A27] flex items-center justify-center">
+                      <Users className="w-7 h-7 text-[#6E6A65]" />
+                    </div>
+                    <div className="space-y-3">
+                      <h3 className="font-serif italic text-xl text-[#F0EDE8]">No clients yet.</h3>
+                      <p className="text-[#6E6A65] text-sm leading-relaxed font-light">
+                        Share your client link and your buyers or renters will appear here — with their full profile, fears, and readiness score already mapped.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(shareLink); addToast('Client Link Copied!'); }}
+                      className="w-full py-4 bg-[#C8B89A] text-[#0D0D0B] font-bold text-[10px] uppercase tracking-widest hover:bg-[#E8DCC8] transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Copy className="w-3 h-3" /> Copy Your Client Link
+                    </button>
+                    <p className="text-[9px] text-[#3A3A37] uppercase tracking-widest font-bold">
+                      Send this to anyone starting their search.
+                    </p>
+                  </div>
+                ) : (
+                  // Clients exist but none selected
+                  <div className="flex-col items-center justify-center opacity-25 pointer-events-none hidden lg:flex select-none">
+                    <div className="w-px h-16 bg-gradient-to-b from-transparent via-[#2A2A27] to-transparent mb-6" />
+                    <p className="font-serif italic text-[#6E6A65] text-sm">Select a client to begin</p>
+                  </div>
+                )}
               </div>
             )}
           </AnimatePresence>

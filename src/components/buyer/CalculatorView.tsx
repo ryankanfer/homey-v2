@@ -24,9 +24,10 @@ interface CalculatorViewProps {
   mode: UserMode | '';
   budgetTier: string;
   maxMonthlyRent?: number;
+  frictionData?: any;
 }
 
-export function CalculatorView({ mode, budgetTier, maxMonthlyRent }: CalculatorViewProps) {
+export function CalculatorView({ mode, budgetTier, maxMonthlyRent, frictionData }: CalculatorViewProps) {
   const [price, setPrice] = useState(1000000);
   const [downPercent, setDownPercent] = useState(20);
   const [maint, setMaint] = useState(1500);
@@ -42,11 +43,35 @@ export function CalculatorView({ mode, budgetTier, maxMonthlyRent }: CalculatorV
         setMonthlyRent(RENT_BUDGET_DEFAULTS[budgetTier]);
       }
     } else {
-      if (budgetTier && BUDGET_DEFAULTS[budgetTier]) {
-        setPrice(BUDGET_DEFAULTS[budgetTier]);
+      // 1. Explicit Budget Parsing
+      if (budgetTier) {
+        // Handle "$1.2M", "$750k", or "$1,500,000"
+        let val = budgetTier.replace(/[^0-9.MK]/gi, '').toUpperCase();
+        let numeric = 0;
+        if (val.includes('M')) {
+          numeric = parseFloat(val.replace('M', '')) * 1000000;
+        } else if (val.includes('K')) {
+          numeric = parseFloat(val.replace('K', '')) * 1000;
+        } else {
+          numeric = parseInt(val.replace(/,/g, '')) || 0;
+        }
+        
+        if (numeric > 0) {
+          setPrice(numeric);
+        } else if (BUDGET_DEFAULTS[budgetTier]) {
+          setPrice(BUDGET_DEFAULTS[budgetTier]);
+        }
+      }
+
+      // 2. Risk Disposition Mapping
+      // If tension is high (risk averse), default to higher down payment
+      if (frictionData?.tension !== undefined) {
+        if (frictionData.tension > 65) setDownPercent(25);
+        else if (frictionData.tension < 35) setDownPercent(10);
+        else setDownPercent(20);
       }
     }
-  }, [mode, budgetTier]);
+  }, [mode, budgetTier, maxMonthlyRent, frictionData]);
 
   if (mode === 'Rent') {
     const brokerFee = monthlyRent * 12 * 0.15;

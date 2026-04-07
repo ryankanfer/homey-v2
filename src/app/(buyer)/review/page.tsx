@@ -88,7 +88,7 @@ export default function ReviewPage() {
             >
               <div className="text-center mb-10">
                 <div className="text-[10px] text-[#A8956E] font-bold tracking-[0.25em] uppercase mb-2">
-                  System Generated
+                  Built from your answers
                 </div>
                 <h2 className="font-serif text-3xl text-[#F0EDE8]">
                   {profile.fullName?.trim() ? `${profile.fullName.split(' ')[0]}'s Profile` : 'Your Profile'}
@@ -151,6 +151,14 @@ export default function ReviewPage() {
                     Not quite
                   </button>
                 </div>
+                <div className="text-center mt-4">
+                  <button
+                    onClick={() => router.push('/interview')}
+                    className="text-[9px] text-[#6E6A65] hover:text-[#A8A49E] font-bold uppercase tracking-widest transition-colors"
+                  >
+                    ← Redo the interview
+                  </button>
+                </div>
               </div>
             </motion.div>
           )}
@@ -208,11 +216,11 @@ export default function ReviewPage() {
               <CheckCircle2 className="w-12 h-12 text-[#C8B89A] mx-auto mb-6" />
               <h2 className="font-serif text-3xl text-[#F0EDE8] italic mb-3">Check your inbox.</h2>
               <p className="text-[#A8A49E] font-light mb-8">
-                We sent a magic link to <strong className="text-[#F0EDE8]">{email}</strong>.<br />
-                Click it to finalize your profile and enter your dashboard.
+                We sent a link to <strong className="text-[#F0EDE8]">{email}</strong>.<br />
+                Click it to save your profile and open your dashboard.
               </p>
               <div className="flex items-center justify-center gap-2 text-[#6E6A65] text-[10px] font-bold uppercase tracking-widest">
-                <Mail className="w-4 h-4" /> Waiting for verification...
+                <Mail className="w-4 h-4" /> Click the link, then come back
               </div>
             </motion.div>
           )}

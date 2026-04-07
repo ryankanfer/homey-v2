@@ -1,13 +1,17 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  X, Brain, Copy, AlertTriangle, CheckCircle2, Minus, ChevronDown, ArrowLeft, Check
+  X, Brain, Copy, AlertTriangle, CheckCircle2, Minus, ChevronDown, ArrowLeft, Check,
+  MessageSquare, Eye, Clock
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { ClientRow, ActiveProfile, ClientAIIntelligence, VaultDoc } from './types';
 import { MatchmakingDrawer } from './MatchmakingDrawer';
 import { FrictionTelemetry, synthesizeAnomalies } from './FrictionTelemetry';
 import { LiquidityDecayForecast } from './LiquidityDecayForecast';
+import { ScoreArc, JourneyMinimap, JOURNEY_STAGES, deriveJourneyStage } from './agentUtils';
+import { IntelligenceDesk } from './IntelligenceDesk';
+import { StrategyMirror } from './StrategyMirror';
 
 // Constants
 const BUYER_DOCS: { key: keyof VaultDoc; label: string }[] = [
@@ -94,6 +98,14 @@ export function ClientSpotlight({
     [selectedClient, activeProfile]
   );
 
+  const journeyStage = deriveJourneyStage(activeProfile, selectedClient);
+  const stage = JOURNEY_STAGES[journeyStage - 1];
+
+  const vaultKeys: (keyof VaultDoc)[] = ['w2', 'bank', 'preapproval', 'rebny', 'attorney'];
+  const vaultDone = vaultKeys.filter(k => (activeProfile.vault as VaultDoc)?.[k]).length;
+  const vaultTotal = activeProfile.kind === 'renter' ? 5 : 5;
+  const vaultPct = vaultTotal > 0 ? vaultDone / vaultTotal : 0;
+
   const handleComms = (type: 'email' | 'text') => {
     logTouchDate(selectedClient.client_id, type);
     const emailBody = `Hey! Saw a 2BR pop up that might fit your budget. Want me to send the link?`;
@@ -140,6 +152,18 @@ export function ClientSpotlight({
         </button>
       </div>
 
+      {/* Journey Stage Banner */}
+      <div className="flex items-center gap-4 mb-6 px-4 py-3 bg-[#141412] border border-[#2A2A27] rounded-sm">
+        <div className="shrink-0">
+          <div className="text-[9px] uppercase tracking-widest text-[#6E6A65] mb-1">Stage {journeyStage} of 6</div>
+          <div className="font-serif text-base text-[#C8B89A]">{stage?.title}</div>
+          <div className="text-[10px] text-[#6E6A65] italic">{stage?.feeling}</div>
+        </div>
+        <div className="flex-1 flex items-center justify-end">
+          <JourneyMinimap stage={journeyStage} size="md" />
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-8">
         <div className="space-y-8">
           {/* Action Sandbox */}
@@ -169,7 +193,7 @@ export function ClientSpotlight({
                </div>
              </div>
 
-             <div className="text-xs text-[#A8A49E] mb-2 uppercase tracking-wide">Quick Snippets</div>
+             <div className="text-[10px] text-[#6E6A65] font-bold mb-2 uppercase tracking-widest">Quick Snippets</div>
              <div className="space-y-2">
                <div className="p-3 bg-[#0D0D0B] border border-[#2A2A27] text-sm text-[#A8A49E] cursor-pointer hover:border-[#C8B89A] transition-colors" onClick={() => navigator.clipboard.writeText('Hey! Saw a 2BR pop up that might fit your budget. Want me to send the link?')}>
                   Hey! Saw a 2BR pop up that might fit your budget. Want me to send the link? <Copy className="w-3 h-3 inline ml-2" />
@@ -197,6 +221,22 @@ export function ClientSpotlight({
 
           {/* Friction Telemetry — The Silent Observer */}
           <FrictionTelemetry anomalies={anomalies} />
+
+          {/* Document Intelligence Desk */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between border-b border-[#2A2A27] pb-2">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-[#6E6A65]">Document Intelligence</h3>
+            </div>
+            <IntelligenceDesk clientId={selectedClient.client_id} />
+          </div>
+
+          {/* Strategy Mirror — The 1:1 Connection */}
+          <div className="space-y-4 pt-4">
+            <div className="flex items-center justify-between border-b border-[#2A2A27] pb-2">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-[#6E6A65]">Strategist Mirror</h3>
+            </div>
+            <StrategyMirror clientId={selectedClient.client_id} />
+          </div>
         </div>
 
         <div className="space-y-8">
@@ -210,16 +250,76 @@ export function ClientSpotlight({
 
            <div>
              <h3 className="text-[10px] font-bold uppercase tracking-widest text-[#6E6A65] border-b border-[#2A2A27] pb-2 mb-4">Vault Status</h3>
+             <div className="flex items-center gap-4 mb-4">
+               {/* SVG progress ring */}
+               <svg width="56" height="56" viewBox="0 0 56 56" className="shrink-0">
+                 <circle cx="28" cy="28" r="22" fill="none" stroke="#2A2A27" strokeWidth="4" />
+                 <circle
+                   cx="28" cy="28" r="22" fill="none"
+                   stroke={vaultPct >= 1 ? '#4A7C59' : vaultPct >= 0.5 ? '#A8956E' : '#6E6A65'}
+                   strokeWidth="4"
+                   strokeLinecap="round"
+                   strokeDasharray={`${vaultPct * 138.2} 138.2`}
+                   transform="rotate(-90 28 28)"
+                   style={{ transition: 'stroke-dasharray 0.6s ease' }}
+                 />
+                 <text x="28" y="32" textAnchor="middle" fontSize="11" fontWeight="700" fill={vaultPct >= 1 ? '#4A7C59' : '#A8A49E'} fontFamily="serif">
+                   {vaultDone}/{vaultTotal}
+                 </text>
+               </svg>
+               <div>
+                 <div className="text-xs text-[#F0EDE8] font-bold">{vaultPct >= 1 ? 'Vault Complete' : `${vaultTotal - vaultDone} doc${vaultTotal - vaultDone !== 1 ? 's' : ''} missing`}</div>
+                 <div className="text-[10px] text-[#6E6A65] mt-0.5">{Math.round(vaultPct * 100)}% complete</div>
+               </div>
+             </div>
              <div className="flex flex-col gap-2">
               {(activeProfile.kind === 'buyer' ? BUYER_DOCS : RENTER_DOCS).map(doc => {
                 const ready = !!(activeProfile.vault as VaultDoc)?.[doc.key];
                 return (
-                  <div key={doc.key} className="flex justify-between items-center text-xs p-2 border border-[#2A2A27]">
-                    <span className={ready? "text-[#4A7C59]":"text-[#6E6A65]"}>{doc.label}</span>
-                    {ready ? <CheckCircle2 className="w-3.5 h-3.5 text-[#4A7C59]" /> : <Minus className="w-3.5 h-3.5 text-[#2A2A27]" />}
+                  <div key={doc.key} className={`flex justify-between items-center text-xs p-2 border ${ready ? 'border-[#4A7C59]/20 bg-[#4A7C59]/5' : 'border-[#2A2A27]'}`}>
+                    <span className={ready ? 'text-[#4A7C59] font-medium' : 'text-[#6E6A65]'}>{doc.label}</span>
+                    {ready ? <CheckCircle2 className="w-3.5 h-3.5 text-[#4A7C59]" /> : <Minus className="w-3.5 h-3.5 text-[#3A3A37]" />}
                   </div>
                 )
               })}
+             </div>
+           </div>
+
+           {/* Last Activity */}
+           <div>
+             <h3 className="text-[10px] font-bold uppercase tracking-widest text-[#6E6A65] border-b border-[#2A2A27] pb-2 mb-3">Last Activity</h3>
+             <div className="space-y-2 text-xs">
+               {selectedClient.metadata?.last_meaningful_touch ? (() => {
+                 const lmt = selectedClient.metadata.last_meaningful_touch;
+                 const summary = typeof lmt === 'object' ? lmt.summary : lmt;
+                 const date = typeof lmt === 'object' ? lmt.date : null;
+                 const type = typeof lmt === 'object' ? lmt.type : null;
+                 return (
+                   <div className="flex items-start gap-2 p-2 border border-[#2A2A27] bg-[#141412]">
+                     <MessageSquare className="w-3 h-3 text-[#6E6A65] mt-0.5 shrink-0" />
+                     <div>
+                       {type && <div className="text-[9px] uppercase tracking-widest text-[#6E6A65] mb-0.5">{type}</div>}
+                       <div className="text-[#A8A49E]">{summary}</div>
+                       {date && <div className="text-[9px] text-[#6E6A65] mt-0.5 flex items-center gap-1"><Clock className="w-2.5 h-2.5" />{new Date(date).toLocaleDateString()}</div>}
+                     </div>
+                   </div>
+                 );
+               })() : null}
+               {analyses[0] ? (
+                 <div className="flex items-start gap-2 p-2 border border-[#2A2A27] bg-[#141412]">
+                   <Eye className="w-3 h-3 text-[#6E6A65] mt-0.5 shrink-0" />
+                   <div>
+                     <div className="text-[9px] uppercase tracking-widest text-[#6E6A65] mb-0.5">Last Listing Analyzed</div>
+                     <div className="text-[#A8A49E] truncate w-44">{analyses[0].url}</div>
+                     <div className="text-[9px] text-[#6E6A65] mt-0.5 flex items-center gap-1">
+                       <Clock className="w-2.5 h-2.5" />
+                       {new Date(analyses[0].created_at).toLocaleDateString()}
+                     </div>
+                   </div>
+                 </div>
+               ) : (
+                 <div className="text-[10px] text-[#6E6A65] italic p-2">No recent activity recorded.</div>
+               )}
              </div>
            </div>
 

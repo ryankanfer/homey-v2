@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search } from 'lucide-react';
+import { Search, AlertCircle, Eye, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ClientRow, StoryMode } from './types';
 import { ClientCard } from './ClientCard';
@@ -48,12 +48,12 @@ export function ClientList({
         </div>
         <div className="flex flex-wrap gap-1.5 hide-scrollbar overflow-x-auto">
           {(['today', 'bombs', 'quiet', 'ltv', 'all'] as const).map(mode => {
-             const labels = { today: 'Today View', bombs: 'Time Bombs', quiet: 'Quiet Flight Risks', ltv: 'High Value', all: 'All pipeline' };
+             const labels = { today: 'Today', bombs: 'Needs Attention', quiet: 'Going Silent', ltv: 'High Value', all: 'All Clients' };
              const active = storyMode === mode;
              return (
                <button key={mode} onClick={() => setStoryMode(mode)}
                  className={cn("px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest border rounded-full whitespace-nowrap transition-colors",
-                  active ? "bg-[#C8B89A]/10 border-[#C8B89A] text-[#C8B89A]" : "border-[#2A2A27] text-[#6E6A65] hover:border-[#A8956E]")}>
+                  active ? "bg-[#6B8CAE]/10 border-[#6B8CAE] text-[#6B8CAE]" : "border-[#2A2A27] text-[#6E6A65] hover:border-[#6B8CAE]/50")}>
                  {labels[mode]}
                </button>
              )
@@ -72,12 +72,16 @@ export function ClientList({
          {(['critical', 'watch', 'fyi'] as const).map(group => {
             const groupClients = groupedClients[group];
             if (groupClients.length === 0) return null;
-            const groupLabels = { critical: '🔴 Critical', watch: '🟡 Watch', fyi: '⚪ FYI' };
-            
+            const groupMeta = {
+              critical: { label: 'Critical', icon: <AlertCircle className="w-3 h-3" /> },
+              watch:    { label: 'Watch',    icon: <Eye className="w-3 h-3" /> },
+              fyi:      { label: 'FYI',      icon: <Info className="w-3 h-3" /> },
+            };
+
             return (
               <div key={group} className="space-y-2">
                 <div className={cn("px-2 py-1.5 flex justify-between items-center text-[9px] font-bold uppercase tracking-widest rounded-sm border-y", STICKY_STYLES[group])}>
-                  <span>{groupLabels[group]}</span>
+                  <span className="flex items-center gap-1.5">{groupMeta[group].icon} {groupMeta[group].label}</span>
                   <span className="opacity-75">{groupClients.length}</span>
                 </div>
 

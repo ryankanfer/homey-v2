@@ -3,12 +3,16 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { UserProfile } from '@/types/profile';
 import { fetchBuildingIntelligence } from '@/lib/realplus';
 
+import { createClient } from '@supabase/supabase-js';
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export interface StrategyRequestBody {
   messages: { role: 'user' | 'assistant'; content: string }[];
   profile: Pick<UserProfile, 'mode' | 'timeline' | 'budgetTier' | 'territory' | 'fear' | 'frictionData'>;
   isUrlAnalysis?: boolean;
+  userId?: string;
 }
 
 function extractUrl(text: string): string | null {
@@ -19,7 +23,18 @@ function extractUrl(text: string): string | null {
 export async function POST(req: Request) {
   try {
     const body: StrategyRequestBody = await req.json();
-    const { messages, profile, isUrlAnalysis } = body;
+    const { messages, profile, isUrlAnalysis, userId } = body;
+    const lastUserMessage = messages[messages.length - 1];
+
+    // 1. Persist User Message
+    if (userId && lastUserMessage?.role === 'user') {
+      await supabase.from('strategy_chats').insert({
+        user_id: userId,
+        role: 'user',
+        content: lastUserMessage.content,
+        metadata: { isUrlAnalysis }
+      });
+    }
 
     let systemPrompt = `You are a real estate strategy intelligence agent for homey.
 Your focus is on negotiation, deal mechanics, and NYC-specific real estate logic.
@@ -70,6 +85,16 @@ ANALYTICAL FRAMEWORK — use these headers in order:
     const text = response.content[0].type === 'text'
       ? response.content[0].text
       : "I'm having trouble responding right now. Please try again.";
+
+    // 2. Persist Assistant Message
+    if (userId) {
+      await supabase.from('strategy_chats').insert({
+        user_id: userId,
+        role: 'assistant',
+        content: text,
+        metadata: { isUrlAnalysis }
+      });
+    }
 
     return NextResponse.json({ text });
   } catch (err) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Home, Lock, TrendingUp, Building, ArrowRight, ArrowLeft, X } from 'lucide-react';
@@ -27,8 +27,24 @@ export default function InterviewPage() {
     const [step, setStep] = useState(1);
     const [isSynthesizing, setIsSynthesizing] = useState(false);
 
+    // Synthesis ticker state
+    const TICKER_LINES = [
+        `Analyzing your ${profile.budgetTier || profile.maxMonthlyRent ? (profile.mode === 'Rent' ? `$${profile.maxMonthlyRent}/mo` : profile.budgetTier) : ''} ceiling…`,
+        `Mapping ${profile.territory?.slice(0, 2).join(' & ') || 'your territory'} inventory…`,
+        profile.fear ? `Flagging ${profile.fear.toLowerCase()} against your timeline…` : 'Evaluating timeline friction…',
+        'Cross-referencing competing buyer profiles…',
+        'Building your leverage map.',
+    ];
+    const [tickerIndex, setTickerIndex] = useState(0);
+    const tickerInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+
     const handleSynthesize = async () => {
         setIsSynthesizing(true);
+        setTickerIndex(0);
+        tickerInterval.current = setInterval(() => {
+            setTickerIndex(i => Math.min(i + 1, TICKER_LINES.length - 1));
+        }, 1400);
+
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 12000);
         try {
@@ -44,6 +60,7 @@ export default function InterviewPage() {
             updateProfile({ summary: 'Your parameters are set. We will navigate your timeline and budget constraints together.', isPartial: false });
         } finally {
             clearTimeout(timeout);
+            if (tickerInterval.current) clearInterval(tickerInterval.current);
         }
         setIsSynthesizing(false);
         router.push('/review');
@@ -92,20 +109,52 @@ export default function InterviewPage() {
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        className="flex flex-col items-center justify-center flex-1 text-center"
+                        className="flex flex-col items-start justify-center flex-1 max-w-lg mx-auto w-full"
                     >
-                        <div className="flex gap-2 mb-8">
-                            {[0, 0.2, 0.4].map(delay => (
-                                <div
-                                    key={delay}
-                                    className="w-3 h-3 bg-[#C8B89A] rounded-full animate-pulse"
-                                    style={{ animationDelay: `${delay}s` }}
-                                />
+                        <div className="text-[9px] font-bold uppercase tracking-[0.25em] text-[#A8956E] mb-8">
+                            Reading your responses…
+                        </div>
+
+                        <div className="space-y-4 mb-12 w-full">
+                            {TICKER_LINES.map((line, i) => (
+                                <AnimatePresence key={i}>
+                                    {i <= tickerIndex && (
+                                        <motion.div
+                                            initial={{ opacity: 0, x: -12 }}
+                                            animate={{ opacity: i === tickerIndex ? 1 : 0.35, x: 0 }}
+                                            transition={{ duration: 0.4, ease: 'easeOut' }}
+                                            className="flex items-center gap-3"
+                                        >
+                                            <div
+                                                className="w-1.5 h-1.5 rounded-full shrink-0"
+                                                style={{ backgroundColor: i === tickerIndex ? '#C8B89A' : '#3A3A37' }}
+                                            />
+                                            <span
+                                                className="font-serif italic"
+                                                style={{
+                                                    color: i === tickerIndex ? '#F0EDE8' : '#3A3A37',
+                                                    fontSize: i === tickerIndex ? '1.1rem' : '0.95rem',
+                                                    transition: 'all 0.4s',
+                                                }}
+                                            >
+                                                {line}
+                                            </span>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                             ))}
                         </div>
-                        <h3 className="font-serif text-3xl text-[#F0EDE8] italic">
-                            We found some things worth discussing.
-                        </h3>
+
+                        {tickerIndex >= TICKER_LINES.length - 1 && (
+                            <motion.h3
+                                initial={{ opacity: 0, y: 8 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.3 }}
+                                className="font-serif text-3xl text-[#F0EDE8] italic"
+                            >
+                                We found some things worth discussing.
+                            </motion.h3>
+                        )}
                     </motion.div>
                 ) : (
                     <div className="flex-1 flex flex-col justify-center w-full">
@@ -120,16 +169,14 @@ export default function InterviewPage() {
                             >
                                 {step === 1 && (
                                     <InterviewQuestion
-                                        question="What are we looking for?"
+                                        question="Are you buying or renting in NYC?"
                                         options={[
-                                            { label: 'I want to buy', subtext: 'First time or pro, let\'s map it', icon: Home, value: 'Buy' },
-                                            { label: 'I need to rent', subtext: 'Find the right place without the usual chaos', icon: Lock, value: 'Rent' },
-                                            { label: 'I\'m selling', subtext: 'Price it right, time it right', icon: TrendingUp, value: 'Sell' },
-                                            { label: 'I own property', subtext: 'Portfolio, tenants, income', icon: Building, value: 'Own' },
+                                            { label: 'I want to buy', subtext: 'First time or returning — let\'s map it', icon: Home, value: 'Buy' },
+                                            { label: 'I need to rent', subtext: 'Find the right place without the chaos', icon: Lock, value: 'Rent' },
                                         ]}
                                         onSelect={val => {
                                             updateProfile({ mode: val as any });
-                                            if (val === 'Buy' || val === 'Rent') setStep(2);
+                                            setStep(2);
                                         }}
                                     />
                                 )}
@@ -137,6 +184,7 @@ export default function InterviewPage() {
                                 {step === 2 && (
                                     <InterviewQuestion
                                         question={profile.mode === 'Rent' ? "when do you need to move in?" : "How soon does this need to happen?"}
+                                        onBack={() => setStep(1)}
                                         options={profile.mode === 'Rent' ? [
                                             { label: 'ASAP', subtext: 'Ready to sign today', value: 'ASAP' },
                                             { label: '15–30 days', value: '15-30 days' },
@@ -179,6 +227,7 @@ export default function InterviewPage() {
                                         onSelect={() => { }}
                                         hasSelectionOverride={!!profile.maxMonthlyRent && profile.maxMonthlyRent >= 1000}
                                         onContinue={() => setStep(3.1)}
+                                        onBack={() => setStep(2)}
                                         sayMoreLabel="Guarantors or DTI constraints?"
                                         sayMoreValue={profile.budgetContext}
                                         onSayMoreChange={val => updateProfile({ budgetContext: val })}
@@ -194,6 +243,11 @@ export default function InterviewPage() {
                                                     className="w-full bg-[#1A1A17]/30 border border-[#2A2A27] text-[#F0EDE8] p-4 pl-8 rounded-sm outline-none focus:border-[#C8B89A] transition-colors text-xl font-serif"
                                                 />
                                             </div>
+                                            {!!profile.maxMonthlyRent && profile.maxMonthlyRent < 1000 && (
+                                                <p className="text-[10px] text-[#8B3A3A] font-bold uppercase tracking-widest text-center">
+                                                    Minimum budget for NYC rentals is $1,000/mo
+                                                </p>
+                                            )}
                                         </div>
                                     </InterviewQuestion>
                                 )}
@@ -204,6 +258,7 @@ export default function InterviewPage() {
                                         onSelect={() => { }}
                                         hasSelectionOverride={!!profile.budgetTier}
                                         onContinue={() => setStep(3.5)}
+                                        onBack={() => setStep(2)}
                                         sayMoreLabel="Pre-approved, or still figuring it out?"
                                         sayMoreValue={profile.budgetContext}
                                         onSayMoreChange={val => updateProfile({ budgetContext: val })}
@@ -249,6 +304,7 @@ export default function InterviewPage() {
                                 {step === 3.1 && profile.mode === 'Rent' && (
                                     <InterviewQuestion
                                         question={`Does your household income meet $${((profile.maxMonthlyRent || 0) * 40).toLocaleString()} per year?`}
+                                        onBack={() => setStep(3)}
                                         onSelect={(val) => {
                                             updateProfile({ meetsIncomeRequirement: val === 'Yes' });
                                             if (val === 'Yes') {
@@ -275,6 +331,7 @@ export default function InterviewPage() {
                                 {step === 3.2 && profile.mode === 'Rent' && (
                                     <InterviewQuestion
                                         question={`Will you be using a guarantor who earns over $${((profile.maxMonthlyRent || 0) * 80).toLocaleString()} per year?`}
+                                        onBack={() => setStep(3.1)}
                                         onSelect={(val) => {
                                             updateProfile({ usingGuarantor: val === 'Yes' });
                                             setStep(3.5);
@@ -317,9 +374,12 @@ export default function InterviewPage() {
                                                 onClick={() => { updateProfile({ isPartial: true }); router.push('/dashboard'); }}
                                                 className="flex-1 py-4 bg-transparent border border-[#2A2A27] text-[#A8A49E] font-bold text-[10px] uppercase tracking-widest hover:border-[#A8956E] hover:text-[#F0EDE8] transition-all"
                                             >
-                                                Save & Come Back Later
+                                                Preview Dashboard
                                             </button>
                                         </div>
+                                        <p className="text-[9px] text-[#3A3A37] uppercase tracking-widest font-bold">
+                                            Your profile saves when you create an account at the end.
+                                        </p>
                                     </motion.div>
                                 )}
 
@@ -328,6 +388,7 @@ export default function InterviewPage() {
                                         territory={profile.territory || []}
                                         onUpdate={(t) => updateProfile({ territory: t })}
                                         onContinue={() => setStep(5)}
+                                        onBack={() => setStep(3.5)}
                                     />
                                 )}
 
@@ -377,6 +438,7 @@ export default function InterviewPage() {
                                         onSelect={() => { }}
                                         hasSelectionOverride={!!profile.fullName && profile.fullName.trim().length > 2}
                                         onContinue={handleSynthesize}
+                                        onBack={() => setStep(5.2)}
                                     >
                                         <div className="w-full max-w-lg mx-auto flex flex-col mb-8 gap-4">
                                             <div className="relative">
@@ -427,8 +489,8 @@ function TensionSlider({ onComplete, onBack }: { onComplete: (fear: string, data
           className="w-full h-1 bg-[#2A2A27] appearance-none cursor-pointer accent-[#C8B89A]"
         />
         <div className="flex justify-between text-[8px] uppercase tracking-widest text-[#6E6A65] mt-4 font-bold">
-          <span>FOMO</span>
-          <span>FOOP</span>
+          <span>Fear of missing out</span>
+          <span>Fear of overpaying</span>
         </div>
       </div>
       <button onClick={handleContinue} className="w-full py-5 bg-[#C8B89A] text-[#0D0D0B] font-bold text-[10px] uppercase tracking-widest hover:bg-[#E8DCC8] transition-all flex items-center justify-center gap-2 mb-4">
@@ -469,7 +531,7 @@ function ScenarioReaction({ mode, onComplete, onBack }: { mode: 'Buy' | 'Rent', 
 
   return (
     <div className="w-full max-w-lg mx-auto">
-      <div className="text-[10px] text-[#6E6A65] font-bold uppercase tracking-[0.25em] mb-6 text-center">Gut Check {step + 1} of 3</div>
+      <div className="text-[10px] text-[#6E6A65] font-bold uppercase tracking-[0.25em] mb-6 text-center">Scenario {step + 1} of 3</div>
       <h2 className="font-serif text-2xl md:text-5xl text-[#F0EDE8] italic mb-10 md:mb-12 text-center leading-tight">"{scenarios[step].text}"</h2>
       <div className="flex gap-4 mb-4">
         <button onClick={() => handleReaction('dealbreaker')} className="flex-1 py-5 border border-[#8B3A3A] text-[#8B3A3A] hover:bg-[#8B3A3A]/10 font-bold text-[10px] uppercase tracking-widest transition-all">Dealbreaker</button>
@@ -535,10 +597,15 @@ function AnxietyConstellation({ mode, onComplete, onBack }: { mode: 'Buy' | 'Ren
         ))}
       </div>
       <div className="flex flex-col items-center gap-4">
-        {selected.length > 0 && (
-          <button onClick={handleContinue} className="px-12 py-5 bg-[#C8B89A] text-[#0D0D0B] font-bold text-[10px] uppercase tracking-widest hover:bg-[#E8DCC8] transition-all flex items-center justify-center gap-2">
-            EXTRACT INTELLIGENCE <ArrowRight className="w-4 h-4" />
-          </button>
+        <button
+          onClick={handleContinue}
+          disabled={selected.length === 0}
+          className="px-12 py-5 bg-[#C8B89A] text-[#0D0D0B] font-bold text-[10px] uppercase tracking-widest hover:bg-[#E8DCC8] transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Build My Profile <ArrowRight className="w-4 h-4" />
+        </button>
+        {selected.length === 0 && (
+          <p className="text-[9px] text-[#6E6A65] font-bold uppercase tracking-widest">Select at least one to continue</p>
         )}
         <button onClick={onBack} className="py-3 text-[#6E6A65] hover:text-[#F0EDE8] font-bold text-[10px] uppercase tracking-widest transition-colors flex items-center gap-2">
           <ArrowLeft className="w-3 h-3" /> Back

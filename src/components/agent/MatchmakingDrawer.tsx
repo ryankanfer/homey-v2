@@ -1,7 +1,35 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, MessageSquare, Send, X } from 'lucide-react';
+import { Sparkles, Send, X } from 'lucide-react';
 import { ClientRow } from './types';
+
+function RadialScore({ score }: { score: number }) {
+  const size = 40;
+  const radius = 16;
+  const cx = size / 2;
+  const cy = size / 2;
+  const circumference = 2 * Math.PI * radius;
+  const filled = (score / 100) * circumference;
+  const color = score >= 80 ? '#4A7C59' : score >= 60 ? '#C8B89A' : '#6E6A65';
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0">
+      <circle cx={cx} cy={cy} r={radius} fill="none" stroke="#2A2A27" strokeWidth="2.5" />
+      <circle
+        cx={cx} cy={cy} r={radius}
+        fill="none"
+        stroke={color}
+        strokeWidth="2.5"
+        strokeDasharray={`${filled} ${circumference - filled}`}
+        strokeDashoffset={circumference / 4}
+        strokeLinecap="round"
+      />
+      <text x={cx} y={cy + 4} textAnchor="middle" fontSize="8" fontWeight="700" fill={color} fontFamily="serif">
+        {score}
+      </text>
+    </svg>
+  );
+}
 
 interface MatchmakingDrawerProps {
   isOpen: boolean;
@@ -59,11 +87,12 @@ export function MatchmakingDrawer({ isOpen, onClose, matches, listingUrl }: Matc
                       <div>
                         <h4 className="font-serif text-lg text-[#F0EDE8]">{match.client.profile?.full_name || 'Anonymous'}</h4>
                         <div className="text-[10px] text-[#A8A49E] uppercase tracking-widest mt-0.5">
-                          {match.client.buyer_profile ? 'Buyer' : 'Renter'} • {match.score}% Match
+                          {match.client.buyer_profile ? 'Buyer' : 'Renter'}
                         </div>
                       </div>
-                      <div className="bg-[#C8B89A]/10 text-[#C8B89A] text-[10px] font-bold px-2 py-1">
-                        SCORE: {match.score}
+                      <div className="flex flex-col items-center gap-0.5">
+                        <RadialScore score={match.score} />
+                        <span className="text-[9px] text-[#6E6A65] uppercase tracking-widest">match</span>
                       </div>
                     </div>
                     
