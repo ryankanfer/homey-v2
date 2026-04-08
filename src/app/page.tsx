@@ -43,7 +43,7 @@ export default function SplashPage() {
           className="z-10 flex flex-col items-center gap-3"
         >
           <button
-            onClick={() => router.push('/interview')}
+            onClick={() => router.push('/onboarding')}
             aria-label="Get started — takes about 3 minutes"
             className="px-12 py-5 bg-[#C8B89A] text-[#0D0D0B] font-bold text-[11px] tracking-widest uppercase hover:bg-[#E8DCC8] active:bg-[#D8C8A8] transition-colors flex items-center justify-center gap-2 cursor-pointer"
           >

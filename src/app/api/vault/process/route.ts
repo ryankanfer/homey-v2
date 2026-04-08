@@ -62,7 +62,8 @@ export async function POST(req: Request) {
       .single();
 
     if (docResponse.error || !docResponse.data) return NextResponse.json({ error: 'Document not found' }, { status: 404 });
-    const doc = docResponse.data;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const doc = docResponse.data as Record<string, any>;
     
     if (doc.status === 'processed') return NextResponse.json({ message: 'Already processed' });
 

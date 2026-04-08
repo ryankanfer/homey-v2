@@ -24,9 +24,17 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Protect /agent routes — must be authenticated
-  if (request.nextUrl.pathname.startsWith('/agent') && !user) {
-    return NextResponse.redirect(new URL('/auth', request.url));
+  // Protect /agent routes — must be authenticated and have agent role
+  if (request.nextUrl.pathname.startsWith('/agent')) {
+    if (!user) return NextResponse.redirect(new URL('/auth', request.url));
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    if (profile?.role !== 'agent') {
+      return NextResponse.redirect(new URL('/', request.url));
+    }
   }
 
   // Protect /dashboard — must be authenticated

@@ -21,6 +21,7 @@ export interface UserProfile {
   moveInDate?: string;
   budgetTier: string;
   maxMonthlyRent?: number;
+  annualIncome?: number;
   meetsIncomeRequirement?: boolean;
   usingGuarantor?: boolean;
   budgetContext: string;
@@ -53,6 +54,7 @@ export const DEFAULT_USER_PROFILE: UserProfile = {
   moveInDate: '',
   budgetTier: '',
   maxMonthlyRent: undefined,
+  annualIncome: undefined,
   meetsIncomeRequirement: undefined,
   usingGuarantor: undefined,
   budgetContext: '',

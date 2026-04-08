@@ -35,8 +35,49 @@ const GENERIC_INITIAL_MESSAGE: ChatMessage = {
 export default function DashboardPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const { profile, updateProfile, readinessScore } = useProfile();
+  const { profile, updateProfile, readinessScore, isSyncing } = useProfile();
   const supabase = useMemo(() => createClient(), []);
+
+  // Redirect new users (no mode set) to onboarding after profile sync settles
+  useEffect(() => {
+    if (!isSyncing && user && !profile.mode) {
+      router.replace('/onboarding');
+    }
+  }, [isSyncing, user, profile.mode, router]);
+
+  // Check agent connection (gates Vault) and fetch pending connection requests
+  useEffect(() => {
+    if (!user) {
+      setIsCheckingAgent(false);
+      return;
+    }
+    supabase
+      .from('agent_clients')
+      .select('client_id, status, agent_id, agent:profiles!agent_clients_agent_id_fkey(full_name)')
+      .eq('client_id', user.id)
+      .then(({ data }) => {
+        const rows = data ?? [];
+        setHasAgentConnection(rows.some((r: any) => r.status === 'active' || r.status === 'pending'));
+        const requests = rows
+          .filter((r: any) => r.status === 'requested')
+          .map((r: any) => ({ agentId: r.agent_id, agentName: (r.agent as any)?.full_name || 'An agent' }));
+        setPendingRequests(requests);
+        setIsCheckingAgent(false);
+      });
+  }, [user, supabase]);
+
+  const respondToRequest = async (agentId: string, action: 'accept' | 'decline') => {
+    if (!user) return;
+    setRespondingTo(agentId);
+    await fetch('/api/agent-clients', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agentId, clientId: user.id, action }),
+    });
+    setPendingRequests(prev => prev.filter(r => r.agentId !== agentId));
+    if (action === 'accept') setHasAgentConnection(true);
+    setRespondingTo(null);
+  };
 
   const [activeTab, setActiveTab] = useState<'strategy' | 'vault' | 'calculator' | 'market'>('strategy');
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([GENERIC_INITIAL_MESSAGE]);
@@ -50,6 +91,10 @@ export default function DashboardPage() {
   const [showMobileChat, setShowMobileChat] = useState(false);
   const [lastFailedMessage, setLastFailedMessage] = useState<string | null>(null);
   const [completedActions, setCompletedActions] = useState<Set<string>>(new Set());
+  const [hasAgentConnection, setHasAgentConnection] = useState(false);
+  const [isCheckingAgent, setIsCheckingAgent] = useState(true);
+  const [pendingRequests, setPendingRequests] = useState<{ agentId: string; agentName: string }[]>([]);
+  const [respondingTo, setRespondingTo] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const agentQuoteInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -62,9 +107,8 @@ export default function DashboardPage() {
       ? 'Building Profile'
       : 'Just Started';
 
-  // DEV: force-unlock for development — remove before launch
-  const isVaultUnlocked = true; // readinessScore >= VAULT_UNLOCK_THRESHOLD;
-  const isRealityCheckUnlocked = true; // readinessScore >= REALITY_CHECK_UNLOCK_THRESHOLD;
+  const isVaultUnlocked = hasAgentConnection;
+  const isRealityCheckUnlocked = true;
   const isAgentUnlocked = readinessScore >= AGENT_UNLOCK_THRESHOLD;
 
   // Personalize opening message once profile is available
@@ -287,6 +331,31 @@ export default function DashboardPage() {
 
       <ProfileEditModal isOpen={showEditModal} onClose={() => setShowEditModal(false)} />
 
+      {/* Pending agent connection requests */}
+      {pendingRequests.map(req => (
+        <div key={req.agentId} className="border-b border-[#C8B89A]/20 bg-[#141210] px-6 py-3 flex items-center justify-between gap-4">
+          <p className="text-[11px] text-[#A8A49E]">
+            <span className="text-[#C8B89A] font-semibold">{req.agentName}</span> wants to connect with you as your agent.
+          </p>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => respondToRequest(req.agentId, 'accept')}
+              disabled={respondingTo === req.agentId}
+              className="px-3 py-1.5 bg-[#C8B89A] text-[#0D0D0B] text-[9px] font-bold uppercase tracking-widest hover:bg-[#E8DCC8] transition-colors disabled:opacity-50"
+            >
+              {respondingTo === req.agentId ? '...' : 'Accept'}
+            </button>
+            <button
+              onClick={() => respondToRequest(req.agentId, 'decline')}
+              disabled={respondingTo === req.agentId}
+              className="px-3 py-1.5 border border-[#2A2A27] text-[#6E6A65] text-[9px] font-bold uppercase tracking-widest hover:border-[#6E6A65] transition-colors disabled:opacity-50"
+            >
+              Decline
+            </button>
+          </div>
+        </div>
+      ))}
+
       <div className="max-w-7xl mx-auto w-full px-6 py-8 grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-12">
         {/* Sidebar */}
         <aside className="space-y-6">
@@ -339,8 +408,14 @@ export default function DashboardPage() {
                 )}
               </AnimatePresence>
               <button
-                onClick={() => setShowEditModal(true)}
+                onClick={() => router.push('/onboarding')}
                 className="mt-4 text-[9px] text-[#6E6A65] hover:text-[#C8B89A] uppercase tracking-widest transition-colors"
+              >
+                Rebuild profile
+              </button>
+              <button
+                onClick={() => setShowEditModal(true)}
+                className="mt-1 text-[9px] text-[#6E6A65] hover:text-[#C8B89A] uppercase tracking-widest transition-colors"
               >
                 Edit profile
               </button>
@@ -353,7 +428,7 @@ export default function DashboardPage() {
             <div className="space-y-2">
               {[
                 { id: 'strategy', label: 'Strategy Room', sub: 'Guidance + chat', locked: false },
-                { id: 'vault', label: 'The Vault', sub: isVaultUnlocked ? 'Board Package & Prep' : `Score ${VAULT_UNLOCK_THRESHOLD}+ to unlock (you're at ${readinessScore})`, locked: !isVaultUnlocked },
+                { id: 'vault', label: 'The Vault', sub: isCheckingAgent ? 'Checking access...' : isVaultUnlocked ? 'Board Package & Prep' : 'Connect with an agent to unlock', locked: !isVaultUnlocked && !isCheckingAgent },
                 { id: 'calculator', label: 'Reality Check', sub: isRealityCheckUnlocked ? 'Financial Stress Test' : `Complete ${REALITY_CHECK_UNLOCK_THRESHOLD - readinessScore > 0 ? REALITY_CHECK_UNLOCK_THRESHOLD - readinessScore + ' more points' : 'The Vault'} to unlock`, locked: !isRealityCheckUnlocked },
                 { id: 'market', label: 'Market Interpreter', sub: 'Data translation', locked: false },
               ].map(tab => (
@@ -408,7 +483,7 @@ export default function DashboardPage() {
                         : '3 questions stand between you and a clear strategy.'}
                     </p>
                     <button
-                      onClick={() => router.push('/interview')}
+                      onClick={() => router.push('/onboarding')}
                       className="px-6 py-4 bg-[#C8B89A] text-[#0D0D0B] font-bold text-[10px] uppercase tracking-widest hover:bg-[#E8DCC8] transition-all flex items-center gap-2"
                     >
                       Pick up where you left off <ArrowRight className="w-4 h-4" />

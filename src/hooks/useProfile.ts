@@ -47,7 +47,8 @@ export function useProfile() {
         ]);
 
         const dbProfile = (buyerRes.data || renterRes.data) as any;
-        
+        const hadFetchError = !!(buyerRes.error && renterRes.error);
+
         if (dbProfile) {
           // Mapping DB schema to Frontend State
           const mapped: Partial<UserProfile> = {
@@ -74,10 +75,11 @@ export function useProfile() {
               : undefined,
           };
           setProfile(prev => ({ ...prev, ...mapped }));
-        } else {
-          // If logged in but no DB profile, push current local state to DB
+        } else if (!hadFetchError) {
+          // No DB profile exists yet — push current local state to DB
           await syncToDb(profile, user.id);
         }
+        // If both fetches errored, do nothing — don't risk overwriting a real profile
       } catch (err) {
         console.error('Error syncing down profile:', err);
       }

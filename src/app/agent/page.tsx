@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Brain, Copy, ShieldAlert } from 'lucide-react';
+import { Search, Brain, Copy, ShieldAlert, UserPlus } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
@@ -16,6 +16,7 @@ import {
 import { TodayStrip } from '@/components/agent/TodayStrip';
 import { ClientList } from '@/components/agent/ClientList';
 import { ClientSpotlight } from '@/components/agent/ClientSpotlight';
+import { BrowseBuyersPanel } from '@/components/agent/BrowseBuyersPanel';
 
 // Re-use some logic helpers from the original that are too specific to put in generic components
 import { 
@@ -119,6 +120,7 @@ export default function AgentDashboard() {
   const [isGeneratingIntelligence, setIsGeneratingIntelligence] = useState(false);
 
   const [toasts, setToasts] = useState<{id: string, message: string}[]>([]);
+  const [view, setView] = useState<'clients' | 'browse'>('clients');
   const addToast = (message: string) => {
     const id = Math.random().toString(36).substring(2, 11);
     setToasts(prev => [...prev, { id, message }]);
@@ -128,7 +130,7 @@ export default function AgentDashboard() {
   const buyerChannelRef = useRef<RealtimeChannel | null>(null);
   const renterChannelRef = useRef<RealtimeChannel | null>(null);
 
-  const shareLink = user ? `${process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin}/interview?ref=${user.id}` : '';
+  const shareLink = user ? `${process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin}/onboarding?ref=${user.id}` : '';
 
   // Auth guard
   useEffect(() => {
@@ -450,7 +452,14 @@ export default function AgentDashboard() {
       <div className="flex flex-col border-b border-[#2A2A27] bg-[#0D0D0B]/80 backdrop-blur-lg sticky top-0 z-40">
         <nav className="flex items-center justify-between px-6 py-4">
           <span className="font-serif italic text-2xl text-[#C8B89A] tracking-tighter">homey.advsr</span>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setView(v => v === 'browse' ? 'clients' : 'browse')}
+              className={`flex items-center gap-2 px-3 py-1.5 border transition-colors rounded-sm text-[10px] uppercase tracking-widest ${view === 'browse' ? 'border-[#C8B89A] text-[#C8B89A] bg-[#C8B89A]/5' : 'border-[#2A2A27] text-[#6E6A65] hover:border-[#C8B89A] hover:text-[#C8B89A]'}`}
+            >
+              <UserPlus className="w-3 h-3" />
+              <span className="hidden sm:inline">Browse Buyers</span>
+            </button>
             <button
               onClick={() => { navigator.clipboard.writeText(shareLink); addToast('Client Link Copied!'); }}
               className="flex items-center gap-2 px-3 py-1.5 border border-[#2A2A27] hover:border-[#C8B89A] transition-colors rounded-sm group text-[10px] uppercase tracking-widest text-[#6E6A65] hover:text-[#C8B89A]"
@@ -465,7 +474,18 @@ export default function AgentDashboard() {
       </div>
 
       <div className="flex-1 flex overflow-hidden relative">
+        {/* Browse buyers panel — full width overlay */}
+        {view === 'browse' && user && (
+          <div className="flex-1 overflow-y-auto">
+            <BrowseBuyersPanel
+              agentId={user.id}
+              onRequestSent={() => addToast('Connection request sent.')}
+            />
+          </div>
+        )}
+
         {/* Client list: full-width on mobile when no client selected, fixed-width sidebar on desktop */}
+        {view === 'clients' && <>
         <div className={selectedClientId ? 'hidden lg:flex lg:w-auto' : 'flex w-full lg:w-auto'}>
           <ClientList
             groupedClients={groupedClients}
@@ -544,6 +564,7 @@ export default function AgentDashboard() {
             )}
           </AnimatePresence>
         </div>
+        </>}
       </div>
     </div>
   );
