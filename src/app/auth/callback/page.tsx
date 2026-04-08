@@ -92,7 +92,13 @@ export default function AuthCallbackPage() {
         }
       }
 
-      const destination = role === 'agent' ? '/agent' : '/dashboard';
+      let destination = role === 'agent' ? '/agent' : '/dashboard';
+
+      // Redirect to password setup if not set (buyers only)
+      if (role === 'buyer' && !user.user_metadata?.password_set) {
+        destination = `/auth/setup-password${agentRef ? `?ref=${agentRef}` : ''}`;
+      }
+
       router.replace(destination);
     }
 

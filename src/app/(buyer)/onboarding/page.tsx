@@ -370,17 +370,16 @@ const RENT_TIMELINES = [
 ];
 
 const BUY_FEARS = [
-  { label: 'Overpaying at the top of the market', value: 'Overpaying' },
-  { label: 'Hidden structural or co-op board issues', value: 'Issues' },
-  { label: 'Moving too slowly — losing the right place', value: 'Speed' },
-  { label: 'Waiving contingencies I shouldn\'t', value: 'Risk' },
+  { label: 'Overpaying at the top of the market', value: 'Overpaying', stats: 58 },
+  { label: 'Hidden structural or co-op board issues', value: 'Issues', stats: 24 },
+  { label: 'Moving too slowly — losing the right place', value: 'Speed', stats: 12 },
+  { label: 'Waiving contingencies I shouldn\'t', value: 'Risk', stats: 6 },
 ];
 
 const RENT_FEARS = [
-  { label: '15% broker fees — feels like theft', value: 'Fees' },
-  { label: 'Bidding wars on apartments I can afford', value: 'Competition' },
-  { label: 'Getting disqualified on income requirements', value: 'Qualification' },
-  { label: 'Predatory management after signing', value: 'Management' },
+  { label: 'Bidding wars on apartments I can afford', value: 'Competition', stats: 64 },
+  { label: 'Getting disqualified on income requirements', value: 'Qualification', stats: 22 },
+  { label: 'Predatory management after signing', value: 'Management', stats: 14 },
 ];
 
 const TICKER_LINES = (name: string, territory: string[], budget: string, fear: string) => [
@@ -518,20 +517,20 @@ function ProfilePanel({
   const pct = Math.round((filledCount / fields.length) * 100);
 
   return (
-    <aside className="hidden lg:flex flex-col border border-[#2A2A27] bg-[#0D0D0B] w-[280px] h-fit sticky top-12 p-8 shrink-0">
-      <h2 className="font-serif italic text-[20px] text-[#F0EDE8] mb-10">Your Profile</h2>
+    <aside className="hidden lg:flex flex-col border border-[#2A2A27] bg-[#0D0D0B] w-[300px] h-fit sticky top-12 p-10 shrink-0">
+      <h2 className="font-serif italic text-[22px] text-[#F0EDE8] mb-12 border-b border-[#2A2A27] pb-6">Your Profile</h2>
 
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-10">
         {fields.map(({ label, value }) => (
-          <div key={label}>
-            <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#6E6A65] mb-1.5">
+          <div key={label} className="group">
+            <p className="text-[9px] font-black uppercase tracking-[0.25em] text-[#6E6A65] mb-2.5 group-hover:text-[#A8956E] transition-colors">
               {label}
             </p>
             <p className={cn(
-              'text-[13px] transition-colors duration-500', 
-              value ? 'text-[#F0EDE8]' : 'text-[#3A3A37]'
+              'font-serif text-[15px] leading-relaxed transition-all duration-500', 
+              value ? 'text-[#F0EDE8] italic' : 'text-[#2A2A27] opacity-50'
             )}>
-              {value || 'Not set'}
+              {value || 'pending…'}
             </p>
           </div>
         ))}
@@ -691,10 +690,18 @@ export default function OnboardingPage() {
       const { summary } = await res.json();
       updateProfile({ summary, isPartial: false });
     } catch {
-      updateProfile({
-        summary: 'Your parameters are set. We will navigate your timeline and budget constraints together.',
-        isPartial: false,
-      });
+      const firstName = profile.fullName?.split(' ')[0] || 'there';
+      const modeAction = profile.mode === 'Buy' ? 'purchasing' : 'renting';
+      const budget = profile.mode === 'Rent' 
+        ? (profile.maxMonthlyRent ? `$${profile.maxMonthlyRent.toLocaleString()}/mo` : 'your target budget')
+        : (profile.budgetTier || 'your target budget');
+      const territoryNarrative = profile.territory?.length 
+        ? `in ${profile.territory[0].split('(')[0].trim()}${profile.territory.length > 1 ? ' and surrounding areas' : ''}` 
+        : 'within NYC';
+      
+      const summary = `As you navigate ${modeAction} ${territoryNarrative} with a ${budget} ceiling, we've flagged your concerns regarding ${profile.fear?.toLowerCase() || 'market friction'}. We will bridge your ${profile.timeline?.toLowerCase() || 'timeline'} requirements against current inventory to find your best leverage point.`;
+      
+      updateProfile({ summary, isPartial: false });
     } finally {
       clearTimeout(timeout);
     }
@@ -1162,39 +1169,87 @@ export default function OnboardingPage() {
                 </>
               )}
 
-              {/* ── STEP 6: ANXIETY ── */}
-              {step === 6 && (
-                <>
-                  <h2 className="font-serif italic text-[#F0EDE8] leading-snug mb-12" style={{ fontSize: 'clamp(2.25rem, 4.5vw, 3.25rem)' }}>
-                    What makes your stomach drop?
-                  </h2>
-                  <div className="flex flex-col gap-3">
-                    {fears.map(f => (
-                      <button
-                        key={f.value}
-                        type="button"
-                        onClick={() => updateProfile({ fear: f.label })}
-                        aria-pressed={profile.fear === f.label}
-                        className={cn(
-                          'w-full border px-6 py-5 text-left flex items-center justify-between group transition-all duration-300',
-                          profile.fear === f.label
-                            ? 'border-[#C8B89A] bg-[#C8B89A]/5'
-                            : 'border-[#2A2A27] hover:border-[#6E6A65]',
+               {/* ── STEP 6: ANXIETY ── */}
+               {step === 6 && (
+                 <>
+                   <h2 className="font-serif italic text-[#F0EDE8] leading-snug mb-12" style={{ fontSize: 'clamp(2.25rem, 4.5vw, 3.25rem)' }}>
+                     What makes your stomach drop?
+                   </h2>
+                   <div className="flex flex-col gap-3">
+                     {fears.map(f => {
+                       const isSelected = profile.fear === f.label;
+                       return (
+                         <button
+                           key={f.value}
+                           type="button"
+                           onClick={() => updateProfile({ fear: f.label })}
+                           aria-pressed={isSelected}
+                           className={cn(
+                             'w-full border px-6 py-5 text-left flex flex-col group transition-all duration-500 relative overflow-hidden',
+                             isSelected
+                               ? 'border-[#C8B89A] bg-[#C8B89A]/5'
+                               : 'border-[#2A2A27] hover:border-[#6E6A65]',
+                           )}
+                         >
+                           <div className="flex items-center justify-between w-full">
+                             <span className={cn('text-sm transition-colors', isSelected ? 'text-[#C8B89A]' : 'text-[#F0EDE8]/80 group-hover:text-[#F0EDE8]')}>
+                               {f.label}
+                             </span>
+                             {isSelected && f.stats && (
+                               <motion.span 
+                                 initial={{ opacity: 0, x: 10 }}
+                                 animate={{ opacity: 1, x: 0 }}
+                                 className="text-[10px] font-mono text-[#C8B89A]"
+                               >
+                                 {f.stats}% of users share this
+                               </motion.span>
+                             )}
+                           </div>
+                           
+                           {isSelected && f.stats && (
+                             <motion.div 
+                               initial={{ width: 0 }}
+                               animate={{ width: `${f.stats}%` }}
+                               className="absolute bottom-0 left-0 h-[1px] bg-[#C8B89A]/30"
+                             />
+                           )}
+                         </button>
+                       );
+                     })}
+                     
+                     {/* Custom Fear Box */}
+                     <div className={cn(
+                       "mt-4 p-6 border transition-all duration-500",
+                       profile.fear && !fears.find(f => f.label === profile.fear)
+                         ? "border-[#C8B89A] bg-[#C8B89A]/5"
+                         : "border-[#2A2A27] hover:border-[#3A3A37]"
+                     )}>
+                       <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#6E6A65] mb-3">Something else?</p>
+                       <input 
+                         type="text"
+                         placeholder="Describe your primary concern…"
+                         value={fears.find(f => f.label === profile.fear) ? '' : (profile.fear || '')}
+                         onChange={(e) => updateProfile({ fear: e.target.value })}
+                         className="w-full bg-transparent border-b border-[#2A2A27] focus:border-[#C8B89A] outline-none py-2 font-serif italic text-[#F0EDE8] placeholder:text-[#3A3C39] text-base"
+                       />
+                        {profile.fear && !fears.find(f => f.label === profile.fear) && (
+                          <motion.p 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="text-[9px] text-[#A8956E] mt-3 italic"
+                          >
+                            ↳ You aren't alone. We flag highly-specific concerns like this for every property.
+                          </motion.p>
                         )}
-                      >
-                        <span className={cn('text-sm transition-colors', profile.fear === f.label ? 'text-[#C8B89A]' : 'text-[#F0EDE8]/80 group-hover:text-[#F0EDE8]')}>
-                          {f.label}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                  <ContinueBtn
-                    disabled={!profile.fear}
-                    onClick={handleSynthesize}
-                    label="Build my profile"
-                  />
-                </>
-              )}
+                     </div>
+                   </div>
+                   <ContinueBtn
+                     disabled={!profile.fear || profile.fear.length < 3}
+                     onClick={handleSynthesize}
+                     label="Build my profile"
+                   />
+                 </>
+               )}
             </motion.div>
           </AnimatePresence>
         </main>

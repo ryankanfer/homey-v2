@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, AlertCircle } from 'lucide-react';
@@ -26,16 +26,15 @@ function UrlErrorReader({ onError }: { onError: (msg: string) => void }) {
 }
 
 export default function AuthPage() {
-  const { sendOtp, verifyOtp, isAuthenticated, role } = useAuth();
+  const { signInWithMagicLink, signInWithPassword, isAuthenticated, role } = useAuth();
   const router = useRouter();
 
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [selectedRole, setSelectedRole] = useState<UserRole>('buyer');
-  const [step, setStep] = useState<'email' | 'code'>('email');
-  const [code, setCode] = useState(['', '', '', '', '', '']);
+  const [step, setStep] = useState<'email' | 'sent'>('email');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const codeRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
     if (isAuthenticated && role) {
@@ -43,58 +42,32 @@ export default function AuthPage() {
     }
   }, [isAuthenticated, role, router]);
 
-  const handleEmailSubmit = async (e: React.FormEvent) => {
+  const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
     setLoading(true);
     setError(null);
-    const { error } = await sendOtp(email.trim(), selectedRole);
-    if (error) {
-      setError(error);
-      setLoading(false);
+    
+    if (password.trim()) {
+      // ── Password Sign In ──
+      const { error } = await signInWithPassword(email.trim(), password.trim());
+      if (error) {
+        // If password fails, don't automatically send magic link (might be typo)
+        // Provide clear feedback.
+        setError(error === 'Invalid login credentials' ? 'Incorrect password. Leave blank to sign in with a magic link.' : error);
+        setLoading(false);
+      }
+      // On success, redirect is handled by useEffect
     } else {
-      setStep('code');
-      setLoading(false);
-      setTimeout(() => codeRefs.current[0]?.focus(), 50);
-    }
-  };
-
-  const handleCodeInput = (index: number, value: string) => {
-    if (!/^\d*$/.test(value)) return;
-    const next = [...code];
-    next[index] = value.slice(-1);
-    setCode(next);
-    if (value && index < 5) codeRefs.current[index + 1]?.focus();
-    if (next.every(d => d !== '')) {
-      handleVerify(next.join(''));
-    }
-  };
-
-  const handleCodeKeyDown = (index: number, e: React.KeyboardEvent) => {
-    if (e.key === 'Backspace' && !code[index] && index > 0) {
-      codeRefs.current[index - 1]?.focus();
-    }
-  };
-
-  const handleVerify = async (token: string) => {
-    setLoading(true);
-    setError(null);
-    const { error } = await verifyOtp(email.trim(), token);
-    if (error) {
-      setError('Invalid code. Please try again.');
-      setCode(['', '', '', '', '', '']);
-      setLoading(false);
-      setTimeout(() => codeRefs.current[0]?.focus(), 50);
-    }
-    // On success, onAuthStateChange fires → useEffect above redirects
-  };
-
-  const handlePaste = (e: React.ClipboardEvent) => {
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
-    if (pasted.length === 6) {
-      setCode(pasted.split(''));
-      e.preventDefault();
-      handleVerify(pasted);
+      // ── Magic Link Sign In ──
+      const { error } = await signInWithMagicLink(email.trim(), selectedRole);
+      if (error) {
+        setError(error);
+        setLoading(false);
+      } else {
+        setStep('sent');
+        setLoading(false);
+      }
     }
   };
 
@@ -122,16 +95,11 @@ export default function AuthPage() {
                 <AlertCircle className="w-4 h-4 text-[#8B3A3A] shrink-0 mt-0.5" />
                 <div>
                   <p className="text-[#8B3A3A] text-xs">{error}</p>
-                  {error.includes('wait') && (
-                    <p className="text-[#6E6A65] text-[10px] mt-1">
-                      Please wait a few minutes before requesting another code.
-                    </p>
-                  )}
                 </div>
               </div>
             )}
 
-            <form onSubmit={handleEmailSubmit} className="space-y-4">
+            <form onSubmit={handleAuthSubmit} className="space-y-4">
               <div className="flex gap-2 mb-6">
                 {(['buyer', 'agent'] as UserRole[]).map(r => (
                   <button
@@ -149,65 +117,73 @@ export default function AuthPage() {
                 ))}
               </div>
 
-              <input
-                type="email"
-                placeholder="your@email.com"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                required
-                className="w-full bg-[#141412] border border-[#2A2A27] focus:border-[#C8B89A] outline-none px-5 py-4 text-sm text-[#F0EDE8] placeholder:text-[#6E6A65] transition-colors"
-              />
+              <div className="space-y-4">
+                <input
+                  type="email"
+                  placeholder="your@email.com"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  required
+                  className="w-full bg-[#141412] border border-[#2A2A27] focus:border-[#C8B89A] outline-none px-5 py-4 text-sm text-[#F0EDE8] placeholder:text-[#6E6A65] transition-colors"
+                />
+
+                <div className="relative group">
+                  <input
+                    type="password"
+                    placeholder="password (leave blank for magic link)"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    className="w-full bg-[#141412] border border-[#2A2A27] focus:border-[#C8B89A] outline-none px-5 py-4 text-sm text-[#F0EDE8] placeholder:text-[#3A3C39] transition-colors"
+                  />
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-focus-within:opacity-100 transition-opacity">
+                    <span className="text-[8px] font-bold uppercase tracking-tighter text-[#6E6A65]">Optional</span>
+                  </div>
+                </div>
+              </div>
 
               <button
                 type="submit"
                 disabled={loading || !email.trim()}
-                className="w-full py-4 bg-[#C8B89A] text-[#0D0D0B] font-bold text-[10px] uppercase tracking-widest hover:bg-[#E8DCC8] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full mt-2 py-4 bg-[#C8B89A] text-[#0D0D0B] font-bold text-[10px] uppercase tracking-widest hover:bg-[#E8DCC8] transition-colors disabled:opacity-50 flex items-center justify-center gap-2 group"
               >
-                {loading ? 'Sending...' : <>Sign In <ArrowRight className="w-3 h-3" /></>}
+                {loading ? 'Processing...' : (
+                  <>
+                    {password ? 'Sign In' : 'Send Magic Link'}
+                    <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                  </>
+                )}
               </button>
             </form>
           </motion.div>
         ) : (
           <motion.div
-            key="code"
+            key="sent"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             className="w-full max-w-md text-center"
           >
             <span className="font-serif italic text-3xl text-[#C8B89A] tracking-tighter">homey.</span>
-            <h2 className="font-serif text-2xl text-[#F0EDE8] mt-6 mb-2">Check your email.</h2>
-            <p className="text-[#A8A49E] font-light text-sm mb-8">
-              We sent a 6-digit code to <strong className="text-[#F0EDE8]">{email}</strong>.
-            </p>
-
-            {error && (
-              <div className="flex items-start gap-3 mb-6 p-4 border border-[#8B3A3A]/30 bg-[#8B3A3A]/10 rounded-sm text-left">
-                <AlertCircle className="w-4 h-4 text-[#8B3A3A] shrink-0 mt-0.5" />
-                <p className="text-[#8B3A3A] text-xs">{error}</p>
-              </div>
-            )}
-
-            <div className="flex gap-3 justify-center mb-8" onPaste={handlePaste}>
-              {code.map((digit, i) => (
-                <input
-                  key={i}
-                  ref={el => { codeRefs.current[i] = el; }}
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={1}
-                  value={digit}
-                  onChange={e => handleCodeInput(i, e.target.value)}
-                  onKeyDown={e => handleCodeKeyDown(i, e)}
-                  disabled={loading}
-                  className="w-12 h-14 bg-[#141412] border border-[#2A2A27] focus:border-[#C8B89A] outline-none text-center text-xl font-serif text-[#F0EDE8] transition-colors disabled:opacity-50"
-                />
-              ))}
+            <div className="mt-12 mb-8">
+               <div className="w-16 h-16 bg-[#C8B89A]/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                 <motion.div
+                   animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
+                   transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                 >
+                   <motion.svg className="w-6 h-6 text-[#C8B89A]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                   </motion.svg>
+                 </motion.div>
+               </div>
+               <h2 className="font-serif text-2xl text-[#F0EDE8] mb-2">Check your email.</h2>
+               <p className="text-[#A8A49E] font-light text-sm">
+                 We've sent a magic link to <strong className="text-[#F0EDE8]">{email}</strong>.
+               </p>
             </div>
-
+            
             <button
               type="button"
-              onClick={() => { setStep('email'); setCode(['', '', '', '', '', '']); setError(null); }}
+              onClick={() => { setStep('email'); setError(null); }}
               className="text-[#6E6A65] text-[10px] font-bold uppercase tracking-widest hover:text-[#F0EDE8] transition-colors"
             >
               ← Use a different email
