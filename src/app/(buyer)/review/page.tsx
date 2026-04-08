@@ -1,16 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Nav } from '@/components/buyer/Nav';
 import { useProfile } from '@/hooks/useProfile';
 import { useAuth } from '@/contexts/auth-context';
+import { performAgentLinkage } from '@/lib/agent-linkage';
 import { CheckCircle2, ArrowRight, Mail, AlertCircle } from 'lucide-react';
 import type { AccuracyRating } from '@/types/profile';
 
-export default function ReviewPage() {
+function ReviewPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const agentRef = searchParams.get('ref');
   const { profile, updateProfile } = useProfile();
   const { signInWithMagicLink, isAuthenticated, user } = useAuth();
   const [step, setStep] = useState<'accuracy' | 'auth' | 'sent'>('accuracy');
@@ -25,26 +28,11 @@ export default function ReviewPage() {
     }
   }, [step, isAuthenticated, router]);
 
-  const tryLinkAgent = async (clientId: string) => {
-    const agentRef = typeof window !== 'undefined' ? sessionStorage.getItem('homey_agent_ref') : null;
-    if (!agentRef) return;
-    try {
-      await fetch('/api/agent-clients', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agentId: agentRef, clientId }),
-      });
-    } catch {
-      // non-fatal
-    } finally {
-      sessionStorage.removeItem('homey_agent_ref');
-    }
-  };
-
   const handleAccuracy = async (rating: AccuracyRating) => {
     updateProfile({ accuracyRating: rating });
     if (isAuthenticated && user) {
-      await tryLinkAgent(user.id);
+      // User already authenticated — link immediately
+      if (agentRef) await performAgentLinkage(agentRef, user.id, 'invite_link');
       router.push('/dashboard');
     } else {
       setStep('auth');
@@ -58,7 +46,13 @@ export default function ReviewPage() {
     setIsSubmitting(true);
     setAuthError(null);
 
-    const { error } = await signInWithMagicLink(email.trim(), profile.mode === 'Rent' ? 'renter' : 'buyer');
+    // Pass the agent ref through the magic link redirect so /auth/callback can link them
+    const redirectPath = agentRef ? `/auth/callback?ref=${encodeURIComponent(agentRef)}` : undefined;
+    const { error } = await signInWithMagicLink(
+      email.trim(),
+      profile.mode === 'Rent' ? 'renter' : 'buyer',
+      redirectPath,
+    );
 
     if (!error) {
       setStep('sent');
@@ -250,5 +244,13 @@ export default function ReviewPage() {
         </AnimatePresence>
       </motion.div>
     </div>
+  );
+}
+
+export default function ReviewPage() {
+  return (
+    <Suspense fallback={null}>
+      <ReviewPageContent />
+    </Suspense>
   );
 }

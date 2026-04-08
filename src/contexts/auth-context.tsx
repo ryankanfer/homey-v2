@@ -14,7 +14,7 @@ interface AuthState {
 }
 
 interface AuthContextType extends AuthState {
-  signInWithMagicLink: (email: string, role?: UserRole) => Promise<{ error: string | null }>;
+  signInWithMagicLink: (email: string, role?: UserRole, redirectPath?: string) => Promise<{ error: string | null }>;
   sendOtp: (email: string, role?: UserRole) => Promise<{ error: string | null }>;
   verifyOtp: (email: string, token: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
@@ -69,13 +69,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (data) setState(prev => ({ ...prev, role: (data as any).role as UserRole }));
   }, [supabase]);
 
-  const signInWithMagicLink = useCallback(async (email: string, role: UserRole = 'buyer') => {
+  const signInWithMagicLink = useCallback(async (
+    email: string,
+    role: UserRole = 'buyer',
+    redirectPath?: string,
+  ) => {
+    const base = `${window.location.origin}/auth/callback`;
+    const emailRedirectTo = redirectPath
+      ? `${base}?${new URLSearchParams({ next: redirectPath }).toString()}`
+      : base;
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-        data: { role },
-      },
+      options: { emailRedirectTo, data: { role } },
     });
     return { error: error?.message ?? null };
   }, [supabase]);

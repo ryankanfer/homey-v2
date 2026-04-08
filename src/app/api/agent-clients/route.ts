@@ -63,21 +63,31 @@ export async function POST(req: Request) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { agentId, clientId } = await req.json();
+    const { agentId, clientId, source = 'invite_link' } = await req.json();
     if (!agentId || !clientId) return NextResponse.json({ error: 'Missing params' }, { status: 400 });
     if (user.id !== clientId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-    const admin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-    const { error } = await admin.from('agent_clients').upsert(
-      { agent_id: agentId, client_id: clientId, status: 'pending' },
-      { onConflict: 'agent_id,client_id' }
-    );
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    const admin = adminClient();
 
-    return NextResponse.json({ ok: true });
+    // Insert-only: do NOT overwrite an existing record's status.
+    // If a record already exists (e.g. agent already sent a 'requested' connection),
+    // preserve that higher-intent status rather than downgrading it to 'pending'.
+    const { error, data } = await admin
+      .from('agent_clients')
+      .insert({ agent_id: agentId, client_id: clientId, status: 'pending', source })
+      .select('id')
+      .maybeSingle();
+
+    if (error) {
+      // Unique constraint violation = record already exists — not an error for the caller
+      if (error.code === '23505') {
+        console.info('Agent-client record already exists for pair', { agentId, clientId });
+        return NextResponse.json({ ok: true, existed: true }, { status: 200 });
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true, id: data?.id });
   } catch (err) {
     console.error('Agent-client linkage error:', err);
     return NextResponse.json({ error: 'Failed to create linkage' }, { status: 500 });

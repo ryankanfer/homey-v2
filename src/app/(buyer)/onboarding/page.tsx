@@ -400,14 +400,18 @@ const stepVariants = {
 };
 
 // ─── REF CAPTURE (agent referral) ───────────────────────────────────────────
+// Reads ?ref= from the URL and stores it in a module-level variable so the
+// parent component can forward it to /review as a URL param.
+// We avoid sessionStorage entirely — it breaks on iOS Safari (ITP) when
+// links are opened from iMessage or email clients.
+
+let _capturedAgentRef: string | null = null;
 
 function RefCapture() {
   const searchParams = useSearchParams();
   useEffect(() => {
     const ref = searchParams.get('ref');
-    if (ref && typeof window !== 'undefined') {
-      sessionStorage.setItem('homey_agent_ref', ref);
-    }
+    if (ref) _capturedAgentRef = ref;
   }, [searchParams]);
   return null;
 }
@@ -694,7 +698,10 @@ export default function OnboardingPage() {
     } finally {
       clearTimeout(timeout);
     }
-    setTimeout(() => router.push('/review'), 7500);
+    const reviewPath = _capturedAgentRef
+      ? `/review?ref=${encodeURIComponent(_capturedAgentRef)}`
+      : '/review';
+    setTimeout(() => router.push(reviewPath), 7500);
   }
 
   const nameValid = profile.fullName.trim().length >= 2;
@@ -1087,7 +1094,7 @@ export default function OnboardingPage() {
                                                   initial={{ height: 0, opacity: 0 }}
                                                   animate={{ height: 'auto', opacity: 1 }}
                                                   exit={{ height: 0, opacity: 0 }}
-                                                  className="overflow-hidden bg-[#141412] p-3 mt-1 border border-[#2A2A27] z-10 relative"
+                                                  className="bg-[#141412] p-3 mt-1 border border-[#2A2A27] z-10 relative"
                                                 >
                                                   <div className="flex flex-wrap gap-2">
                                                     {/* "ALL" Neighborhood Option */}
@@ -1124,9 +1131,9 @@ export default function OnboardingPage() {
                                                           )}
                                                         >
                                                           {mName}
-                                                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-[#0D0D0B] border border-[#2A2A27] opacity-0 group-hover/tool:opacity-100 pointer-events-none transition-opacity z-[60] shadow-2xl">
-                                                            <p className="text-[8px] leading-relaxed normal-case font-bold text-[#F0EDE8] mb-1 italic">{mName}</p>
-                                                            <p className="text-[8px] leading-relaxed normal-case font-normal text-[#A8A49E] line-clamp-4">{(mData as any).summary}</p>
+                                                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 p-3 bg-[#0D0D0B] border border-[#2A2A27] opacity-0 group-hover/tool:opacity-100 pointer-events-none transition-opacity z-[60] shadow-2xl">
+                                                            <p className="text-[10px] leading-relaxed normal-case font-bold text-[#F0EDE8] mb-1.5 italic text-center">{mName}</p>
+                                                            <p className="text-[9px] leading-relaxed normal-case font-normal text-[#A8A49E] line-clamp-4 text-center">{(mData as any).summary}</p>
                                                           </div>
                                                         </button>
                                                       );

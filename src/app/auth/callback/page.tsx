@@ -3,11 +3,24 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
+import { performAgentLinkage } from '@/lib/agent-linkage';
 
 /**
  * Auth callback handler — supports BOTH flows:
  *   1. PKCE flow  → ?code=xxx  (normal magic link via email)
  *   2. Implicit   → #access_token=xxx  (admin-generated links, older flow)
+ *
+ * Agent ref passthrough:
+ *   The ?ref= param is carried through the entire URL chain:
+ *   /onboarding?ref= → /review?ref= → emailRedirectTo includes ref
+ *   → this page reads ?ref= and calls performAgentLinkage.
+ *   No sessionStorage — survives iOS Safari ITP + browser switches.
+ *
+ * Agent invitation reconciliation (fallback):
+ *   For newly-registered agents, checks agent_invitations for any pending
+ *   invitations that match their email and auto-creates agent_clients rows.
+ *   This is a fallback for cases where the Supabase trigger may have missed
+ *   the signup (e.g. email typo correction, manual account creation).
  *
  * Hash fragments are invisible to server route handlers,
  * so this MUST be a client-side page component.
@@ -25,6 +38,8 @@ export default function AuthCallbackPage() {
     async function handleCallback() {
       const params = new URLSearchParams(window.location.search);
       const code = params.get('code');
+      // Agent ref passed through the magic link redirect URL
+      const agentRef = params.get('ref');
 
       // ── Flow 1: PKCE (code in query string) ──
       if (code) {
@@ -37,11 +52,8 @@ export default function AuthCallbackPage() {
       }
 
       // ── Flow 2: Implicit (tokens in hash fragment) ──
-      // The Supabase client auto-detects #access_token on page load
-      // and sets the session internally. We just need to wait for it.
       const hash = window.location.hash;
       if (!code && hash && hash.includes('access_token')) {
-        // Give Supabase client a moment to parse the hash and set session
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
@@ -53,20 +65,9 @@ export default function AuthCallbackPage() {
         return;
       }
 
-      // ── Agent referral linkage ──
-      const agentRef = sessionStorage.getItem('homey_agent_ref');
+      // ── Agent referral linkage (Avenue 3) ──
       if (agentRef) {
-        try {
-          await fetch('/api/agent-clients', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ agentId: agentRef, clientId: user.id }),
-          });
-        } catch {
-          console.warn('Agent ref linkage failed silently');
-        } finally {
-          sessionStorage.removeItem('homey_agent_ref');
-        }
+        await performAgentLinkage(agentRef, user.id, 'invite_link');
       }
 
       // Determine role: try metadata first, then DB
@@ -78,6 +79,17 @@ export default function AuthCallbackPage() {
           .eq('id', user.id)
           .single();
         role = (profile as any)?.role;
+      }
+
+      // ── Agent invitation reconciliation fallback ──
+      // If this is a new agent, check for any pending invitations from buyers.
+      // The Supabase trigger handles the common case; this is a safety net.
+      if (role === 'agent') {
+        try {
+          await fetch('/api/agent-invitations/reconcile', { method: 'POST' });
+        } catch {
+          // non-fatal fallback
+        }
       }
 
       const destination = role === 'agent' ? '/agent' : '/dashboard';
