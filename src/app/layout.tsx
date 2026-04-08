@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, Playfair_Display } from 'next/font/google';
+import { Instrument_Sans, Playfair_Display } from 'next/font/google';
 import { AuthProvider } from '@/contexts/auth-context';
 import './globals.css';
 
-const inter = Inter({
+const instrumentSans = Instrument_Sans({
   subsets: ['latin'],
-  weight: ['300', '400', '500', '600'],
+  weight: ['400', '500', '600'],
   variable: '--font-sans',
   display: 'swap',
 });
@@ -33,7 +33,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`dark scroll-smooth ${inter.variable} ${playfair.variable}`}>
+    <html lang="en" className={`dark scroll-smooth ${instrumentSans.variable} ${playfair.variable}`}>
       <body className="min-h-screen bg-[#0D0D0B] text-[#F0EDE8] antialiased">
         <AuthProvider>
           {children}
