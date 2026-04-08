@@ -18,6 +18,7 @@ interface AuthContextType extends AuthState {
   sendOtp: (email: string, role?: UserRole) => Promise<{ error: string | null }>;
   verifyOtp: (email: string, token: string) => Promise<{ error: string | null }>;
   signInWithPassword: (email: string, password: string) => Promise<{ error: string | null }>;
+  signUpWithPassword: (email: string, password: string, role?: UserRole) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -108,8 +109,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: error?.message ?? null };
   }, [supabase]);
 
+  const signUpWithPassword = useCallback(async (email: string, password: string, role: UserRole = 'buyer') => {
+    const { error } = await supabase.auth.signUp({ 
+      email, 
+      password,
+      options: { data: { role } }
+    });
+    return { error: error?.message ?? null };
+  }, [supabase]);
+
   return (
-    <AuthContext.Provider value={{ ...state, signInWithMagicLink, sendOtp, verifyOtp, signInWithPassword, signOut }}>
+    <AuthContext.Provider value={{ ...state, signInWithMagicLink, sendOtp, verifyOtp, signInWithPassword, signUpWithPassword, signOut }}>
       {children}
     </AuthContext.Provider>
   );

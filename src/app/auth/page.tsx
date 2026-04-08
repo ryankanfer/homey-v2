@@ -26,13 +26,14 @@ function UrlErrorReader({ onError }: { onError: (msg: string) => void }) {
 }
 
 export default function AuthPage() {
-  const { signInWithMagicLink, signInWithPassword, isAuthenticated, role } = useAuth();
+  const { signInWithMagicLink, signInWithPassword, signUpWithPassword, isAuthenticated, role } = useAuth();
   const router = useRouter();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [selectedRole, setSelectedRole] = useState<UserRole>('buyer');
   const [step, setStep] = useState<'email' | 'sent'>('email');
+  const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -57,15 +58,26 @@ export default function AuthPage() {
     setError(null);
     
     if (password.trim()) {
-      // ── Password Sign In ──
-      const { error } = await signInWithPassword(email.trim(), password.trim());
-      if (error) {
-        // If password fails, don't automatically send magic link (might be typo)
-        // Provide clear feedback.
-        setError(error === 'Invalid login credentials' ? 'Incorrect password. Leave blank to sign in with a magic link.' : error);
-        setLoading(false);
+      // ── Password Sign In / Sign Up ──
+      if (isSignUp) {
+        const { error } = await signUpWithPassword(email.trim(), password.trim(), selectedRole);
+        if (error) {
+          setError(error);
+          setLoading(false);
+        } else {
+          setStep('sent');
+          setLoading(false);
+        }
+      } else {
+        const { error } = await signInWithPassword(email.trim(), password.trim());
+        if (error) {
+          // If password fails, don't automatically send magic link (might be typo)
+          // Provide clear feedback.
+          setError(error === 'Invalid login credentials' ? 'Incorrect password. Leave blank to sign in with a magic link.' : error);
+          setLoading(false);
+        }
+        // On success, redirect is handled by useEffect
       }
-      // On success, redirect is handled by useEffect
     } else {
       // ── Magic Link Sign In ──
       const { error } = await signInWithMagicLink(email.trim(), selectedRole);
@@ -95,7 +107,9 @@ export default function AuthPage() {
           >
             <div className="text-center mb-10">
               <span className="font-serif italic text-3xl text-[#C8B89A] tracking-tighter">homey.</span>
-              <p className="text-[#6E6A65] text-xs font-bold uppercase tracking-widest mt-3">Sign in to continue</p>
+              <p className="text-[#6E6A65] text-xs font-bold uppercase tracking-widest mt-3">
+                {isSignUp ? 'Create an account' : 'Sign in to continue'}
+              </p>
             </div>
 
             {error && (
@@ -156,11 +170,21 @@ export default function AuthPage() {
               >
                 {loading ? 'Processing...' : (
                   <>
-                    {password ? 'Sign In' : 'Send Magic Link'}
+                    {password ? (isSignUp ? 'Create Account' : 'Sign In') : 'Send Magic Link'}
                     <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
                   </>
                 )}
               </button>
+              
+              <div className="mt-6 text-center">
+                <button
+                  type="button"
+                  onClick={() => setIsSignUp(!isSignUp)}
+                  className="text-[#6E6A65] text-[10px] font-bold uppercase tracking-widest hover:text-[#C8B89A] transition-colors"
+                >
+                  {isSignUp ? 'Already have an account? Sign in' : 'Need an account? Create one'}
+                </button>
+              </div>
             </form>
           </motion.div>
         ) : (
