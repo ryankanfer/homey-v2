@@ -96,12 +96,17 @@ function ReviewPageContent() {
                       {profile.mode === 'Rent' ? 'Max Monthly Rent' : 'Budget Ceiling'}
                     </span>
                     <span className="font-serif text-lg text-[#C8B89A]">
-                      {profile.mode === 'Rent' ? `$${profile.maxMonthlyRent?.toLocaleString()}/mo` : profile.budgetTier || 'Undisclosed'}
+                      {profile.mode === 'Rent' 
+                        ? (profile.maxMonthlyRent ? `$${profile.maxMonthlyRent.toLocaleString()}/mo` : 'Undisclosed') 
+                        : (profile.budgetTier === 'Custom Amount' && profile.maxMonthlyRent 
+                            ? `$${profile.maxMonthlyRent.toLocaleString()}` 
+                            : (profile.budgetTier || 'Undisclosed'))
+                      }
                     </span>
                   </div>
                   <div>
                     <span className="text-[8px] text-[#6E6A65] uppercase tracking-widest block mb-1">Timeline</span>
-                    <span className="font-serif text-lg text-[#C8B89A]">{profile.timeline || 'Flexible'}</span>
+                    <span className="font-serif text-lg text-[#C8B89A]">{profile.timeline || profile.timelineContext || 'Flexible'}</span>
                   </div>
                   {(profile.mode === 'Rent' && (profile.meetsIncomeRequirement !== undefined || profile.annualIncome)) && (
                     <div className="col-span-full pt-1">
@@ -141,7 +146,7 @@ function ReviewPageContent() {
                   </div>
                 </div>
 
-                <div className="bg-[#C8B89A]/5 border border-[#A8956E]/20 p-6 rounded-sm text-sm text-[#E8DCC8] italic leading-relaxed">
+                <div className="bg-[#C8B89A]/5 border border-[#A8956E]/20 p-6 rounded-sm text-sm text-[#E8DCC8] italic leading-relaxed min-h-[80px] flex items-center justify-center text-center">
                   &ldquo;{profile.summary || 'Building your strategic profile...'}&rdquo;
                 </div>
               </div>
@@ -168,14 +173,15 @@ function ReviewPageContent() {
                     Not quite
                   </button>
                 </div>
-                <div className="text-center mt-4">
-                  <button
-                    onClick={() => router.push('/onboarding')}
-                    className="text-[9px] text-[#6E6A65] hover:text-[#A8A49E] font-bold uppercase tracking-widest transition-colors"
-                  >
-                    ← Redo onboarding
-                  </button>
-                </div>
+              </div>
+
+              <div className="text-center mt-8">
+                <button
+                  onClick={() => router.push('/onboarding')}
+                  className="text-[9px] text-[#6E6A65] hover:text-[#A8A49E] font-bold uppercase tracking-widest transition-colors opacity-50 hover:opacity-100"
+                >
+                  ← Redo onboarding
+                </button>
               </div>
             </motion.div>
           )}

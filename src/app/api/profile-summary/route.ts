@@ -9,7 +9,7 @@ export async function POST(req: Request) {
     const profile: UserProfile = await req.json();
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-3-5-sonnet-20240620',
       max_tokens: 350,
       system: `You are an empathetic, editorial real estate strategist. Based on the following ${profile.mode.toLowerCase()} profile parameters, write a detailed 3-4 sentence strategic summary speaking directly to the user (use "You").
 

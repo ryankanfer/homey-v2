@@ -2,11 +2,12 @@
 // Version: 2.1.2 - Hierarchical Territory System (Metadata-Rich)
 
 import { useState, useEffect, useRef, Suspense } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowRight, ArrowLeft } from 'lucide-react';
 import { useProfile } from '@/hooks/useProfile';
 import { cn } from '@/lib/utils';
+import { NEIGHBORHOOD_STATS, RENTER_NEIGHBORHOOD_STATS } from '@/types/profile';
 
 // ─── CONSTANTS ─────────────────────────────────────────────────────────────
 
@@ -353,7 +354,7 @@ const BOROUGHS: Record<string, {
   }
 };
 
-const BUY_TIERS = ['Under $750K', '$750K – $1.2M', '$1.2M – $2M', '$2M – $3.5M', '$3.5M+'];
+const BUY_TIERS = ['Under $750K', '$750K – $1.2M', '$1.2M – $2M', '$2M – $3.5M', '$3.5M+', 'Custom Amount'];
 
 const BUY_TIMELINES = [
   { label: 'I needed to start yesterday', value: 'Immediate' },
@@ -517,10 +518,10 @@ function ProfilePanel({
   const pct = Math.round((filledCount / fields.length) * 100);
 
   return (
-    <aside className="hidden lg:flex flex-col border border-[#2A2A27] bg-[#0D0D0B] w-[300px] h-fit sticky top-12 p-10 shrink-0">
-      <h2 className="font-serif italic text-[22px] text-[#F0EDE8] mb-12 border-b border-[#2A2A27] pb-6">Your Profile</h2>
+    <aside className="hidden lg:flex flex-col border border-[#2A2A27] bg-[#0D0D0B] w-[280px] h-fit sticky top-12 p-8 shrink-0">
+      <h2 className="font-serif italic text-[20px] text-[#F0EDE8] mb-8 border-b border-[#2A2A27] pb-4">Your Profile</h2>
 
-      <div className="flex flex-col gap-10">
+      <div className="flex flex-col gap-6">
         {fields.map(({ label, value }) => (
           <div key={label} className="group">
             <p className="text-[9px] font-black uppercase tracking-[0.25em] text-[#6E6A65] mb-2.5 group-hover:text-[#A8956E] transition-colors">
@@ -536,8 +537,8 @@ function ProfilePanel({
         ))}
       </div>
 
-      <div className="mt-12 pt-8 border-t border-[#2A2A27]">
-        <div className="flex justify-between items-end mb-3">
+      <div className="mt-8 pt-6 border-t border-[#2A2A27]">
+        <div className="flex justify-between items-end mb-2">
           <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#F0EDE8]">
             Profile Readiness
           </p>
@@ -645,6 +646,13 @@ export default function OnboardingPage() {
   const [isSynthesizing, setIsSynthesizing] = useState(false);
   const [expandedBorough, setExpandedBorough] = useState<string | null>(null);
   const [activeNeighborhood, setActiveNeighborhood] = useState<string | null>(null);
+  const { scrollY } = useScroll();
+  
+  // Transform values for logo: center to left, fade out center, fade in left
+  const logoOpacity = useTransform(scrollY, [0, 100], [1, 0]);
+  const leftLogoOpacity = useTransform(scrollY, [100, 200], [0, 1]);
+  const logoX = useTransform(scrollY, [0, 100], ["-50%", "-100%"]);
+
   const TOTAL_STEPS = 6;
 
   // Set default expanded borough on step 5 only once
@@ -761,7 +769,18 @@ export default function OnboardingPage() {
           <ArrowLeft className="w-3 h-3" />
           Back
         </button>
-        <span className="font-serif italic text-[24px] text-[#C8B89A] tracking-tight absolute left-1/2 -translate-x-1/2">homey.</span>
+        <motion.span 
+          style={{ opacity: logoOpacity, x: logoX }}
+          className="font-serif italic text-[24px] text-[#C8B89A] tracking-tight absolute left-1/2"
+        >
+          homey.
+        </motion.span>
+        <motion.span 
+          style={{ opacity: leftLogoOpacity }}
+          className="font-serif italic text-[18px] text-[#C8B89A] tracking-tight absolute left-24"
+        >
+          homey.
+        </motion.span>
       </nav>
 
       {/* Main split layout */}
@@ -981,18 +1000,52 @@ export default function OnboardingPage() {
                       />
                     </div>
                   ) : (
-                    <div className="grid grid-cols-2 gap-3">
-                      {BUY_TIERS.map(tier => (
-                        <OptionBtn
-                          key={tier}
-                          label={tier}
-                          selected={profile.budgetTier === tier}
-                          onClick={() => {
-                            updateProfile({ budgetTier: tier });
-                            setTimeout(() => goNext(5), 320);
-                          }}
-                        />
-                      ))}
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-2 gap-3">
+                        {BUY_TIERS.map(tier => (
+                          <OptionBtn
+                            key={tier}
+                            label={tier}
+                            selected={profile.budgetTier === tier}
+                            onClick={() => {
+                              updateProfile({ budgetTier: tier, maxMonthlyRent: undefined });
+                              if (tier !== 'Custom Amount') {
+                                setTimeout(() => goNext(5), 320);
+                              }
+                            }}
+                          />
+                        ))}
+                      </div>
+
+                      <AnimatePresence>
+                        {profile.budgetTier === 'Custom Amount' && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="pt-6 border-t border-[#2A2A27]"
+                          >
+                            <p className="text-[10px] uppercase font-bold tracking-widest text-[#6E6A65] mb-4">Enter Target Ceiling</p>
+                            <div className="relative group flex items-end gap-3 border-b border-[#2A2A27] focus-within:border-[#F0EDE8] transition-colors">
+                              <span className="font-serif text-[26px] text-[#A8956E] pb-3">$</span>
+                              <input
+                                type="number"
+                                placeholder="1500000"
+                                value={profile.maxMonthlyRent || ''}
+                                onChange={e => {
+                                  const v = e.target.value ? Number(e.target.value) : undefined;
+                                  updateProfile({ maxMonthlyRent: v });
+                                }}
+                                className="w-full bg-transparent outline-none py-3 font-serif text-[26px] text-[#F0EDE8] transition-colors [appearance:textfield]"
+                              />
+                            </div>
+                            <ContinueBtn
+                              disabled={!profile.maxMonthlyRent || profile.maxMonthlyRent < 100000}
+                              onClick={() => goNext(5)}
+                            />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                   )}
                 </>
@@ -1089,9 +1142,25 @@ export default function OnboardingPage() {
                                                 </button>
                                                 
                                                 {/* Neighborhood Hover Summary */}
-                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 p-3 bg-[#0D0D0B] border border-[#2A2A27] opacity-0 group-hover/parent:opacity-100 pointer-events-none transition-opacity z-50 shadow-2xl">
-                                                  <p className="text-[10px] leading-relaxed normal-case font-bold text-[#F0EDE8] mb-1.5 italic text-center">{nName}</p>
-                                                  <p className="text-[9px] leading-relaxed normal-case font-normal text-[#A8A49E] line-clamp-4 text-center">{nData.summary}</p>
+                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-4 bg-[#0D0D0B] border border-[#2A2A27] opacity-0 group-hover/parent:opacity-100 pointer-events-none transition-opacity z-50 shadow-2xl">
+                                                  <p className="text-[10px] leading-relaxed normal-case font-bold text-[#F0EDE8] mb-2 italic border-b border-[#2A2A27] pb-1.5">{nName}</p>
+                                                  {(() => {
+                                                    const stats = profile.mode === 'Rent' ? RENTER_NEIGHBORHOOD_STATS[nName] : NEIGHBORHOOD_STATS[nName];
+                                                    if (!stats) return <p className="text-[9px] leading-relaxed normal-case font-normal text-[#A8A49E] line-clamp-4">{nData.summary}</p>;
+                                                    return (
+                                                      <div className="space-y-2">
+                                                        <div className="flex justify-between text-[8px] uppercase tracking-widest font-bold">
+                                                          <span className="text-[#6E6A65]">{profile.mode === 'Rent' ? 'Med. Rent' : 'Med. Sale'}</span>
+                                                          <span className="text-[#C8B89A]">{profile.mode === 'Rent' ? `$${(stats as any).medianRent.toLocaleString()}` : `$${(stats as any).median.toLocaleString()}`}</span>
+                                                        </div>
+                                                        <div className="flex justify-between text-[8px] uppercase tracking-widest font-bold">
+                                                          <span className="text-[#6E6A65]">Avg. DOM</span>
+                                                          <span className="text-[#F0EDE8]">{stats.dom} Days</span>
+                                                        </div>
+                                                        <p className="text-[9px] leading-relaxed normal-case font-normal text-[#A8A49E] pt-1 border-t border-[#2A2A27]/50 mt-2">{stats.insight}</p>
+                                                      </div>
+                                                    );
+                                                  })()}
                                                 </div>
                                             </div>
                                             
@@ -1169,7 +1238,7 @@ export default function OnboardingPage() {
                 </>
               )}
 
-               {/* ── STEP 6: ANXIETY ── */}
+                {/* ── STEP 6: ANXIETY ── */}
                {step === 6 && (
                  <>
                    <h2 className="font-serif italic text-[#F0EDE8] leading-snug mb-12" style={{ fontSize: 'clamp(2.25rem, 4.5vw, 3.25rem)' }}>
@@ -1195,8 +1264,30 @@ export default function OnboardingPage() {
                              <span className={cn('text-sm transition-colors', isSelected ? 'text-[#C8B89A]' : 'text-[#F0EDE8]/80 group-hover:text-[#F0EDE8]')}>
                                {f.label}
                              </span>
+                             {/* Community Poll Metric */}
+                             <div className="flex flex-col items-end">
+                               <span className={cn(
+                                 "text-[10px] font-bold transition-opacity",
+                                 isSelected ? "opacity-100 text-[#C8B89A]" : "opacity-40 group-hover:opacity-60 text-[#F0EDE8]"
+                               )}>
+                                 {f.label === 'Overpaying at the top of the market' || f.label === 'Bidding wars on apartments I can afford' ? '38%' : 
+                                  f.label === 'Hidden structural or co-op board issues' || f.label === 'Getting disqualified on income requirements' ? '24%' : '19%'}
+                               </span>
+                             </div>
                            </div>
 
+                           {/* Poll Progress Bar */}
+                           <div className="mt-4 w-full h-[1px] bg-[#2A2A27] relative overflow-hidden">
+                             <motion.div 
+                               initial={{ width: 0 }}
+                               animate={{ width: f.label === 'Overpaying at the top of the market' || f.label === 'Bidding wars on apartments I can afford' ? '38%' : 
+                                              f.label === 'Hidden structural or co-op board issues' || f.label === 'Getting disqualified on income requirements' ? '24%' : '19%' }}
+                               className={cn(
+                                 "absolute h-full transition-colors",
+                                 isSelected ? "bg-[#C8B89A]" : "bg-[#6E6A65]"
+                               )}
+                             />
+                           </div>
                          </button>
                        );
                      })}
