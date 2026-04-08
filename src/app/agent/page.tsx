@@ -376,39 +376,6 @@ export default function AgentDashboard() {
     return { critical, watch, fyi };
   }, [filteredClients]);
 
-  // Mock matchmaking results
-  const matchmakingMatches = useMemo(() => {
-     if (!selectedClientId) return [];
-     const current = clients.find(c => c.client_id === selectedClientId);
-     if (!current) return [];
-     const ap = getActiveProfile(current);
-     if (!ap) return [];
-     
-     // Match logic: Same territory + within 20% budget
-     return clients
-       .filter(c => c.client_id !== selectedClientId)
-       .map(c => {
-          const cap = getActiveProfile(c);
-          if (!cap) return null;
-          const commonTerritory = ap.territory.filter(t => cap.territory.includes(t));
-          if (commonTerritory.length === 0) return null;
-          
-          let score = 50 + (commonTerritory.length * 10);
-          let reason = `Also searching in ${commonTerritory.join(', ')}.`;
-          
-          if (ap.kind === 'renter' && cap.kind === 'renter') {
-            const budgetDiff = Math.abs((ap.max_monthly_rent||0) - (cap.max_monthly_rent||0));
-            if (budgetDiff < 500) {
-              score += 20;
-              reason += ` Budgets are highly aligned (within $500).`;
-            }
-          }
-          if (score < 60) return null;
-          return { client: c, reason, score: Math.min(score, 98) };
-       })
-       .filter((x): x is { client: ClientRow, reason: string, score: number } => x !== null)
-       .sort((a, b) => b.score - a.score);
-  }, [selectedClientId, clients]);
 
   const selectedClient = clients.find(c => c.client_id === selectedClientId) ?? null;
   const activeProfile = selectedClient ? getActiveProfile(selectedClient) : null;
@@ -524,9 +491,6 @@ export default function AgentDashboard() {
                 isStreaming={isStreaming}
                 streamingAnalysis={streamingAnalysis}
                 analyses={analyses}
-                matchmakingMatches={matchmakingMatches}
-                isMatchmakingOpen={isMatchmakingOpen}
-                setIsMatchmakingOpen={setIsMatchmakingOpen}
               />
             )}
             {!selectedClient && (

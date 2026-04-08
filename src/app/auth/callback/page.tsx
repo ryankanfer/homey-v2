@@ -92,7 +92,17 @@ export default function AuthCallbackPage() {
         }
       }
 
-      let destination = role === 'agent' ? '/agent' : '/dashboard';
+      let destination: string;
+      if (role === 'agent') {
+        const { data: agentProfile } = await (supabase as any)
+          .from('agent_profiles')
+          .select('onboarding_completed')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        destination = agentProfile?.onboarding_completed === true ? '/agent' : '/agent/onboarding';
+      } else {
+        destination = '/dashboard';
+      }
 
       // Redirect to password setup if not set (buyers only)
       if (role === 'buyer' && !user.user_metadata?.password_set) {

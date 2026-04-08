@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { ClientRow, ActiveProfile, ClientAIIntelligence, VaultDoc } from './types';
-import { MatchmakingDrawer } from './MatchmakingDrawer';
 import { FrictionTelemetry, synthesizeAnomalies } from './FrictionTelemetry';
 import { LiquidityDecayForecast } from './LiquidityDecayForecast';
 import { ScoreArc, JourneyMinimap, JOURNEY_STAGES, deriveJourneyStage } from './agentUtils';
@@ -46,9 +45,6 @@ interface ClientSpotlightProps {
   isStreaming: boolean;
   streamingAnalysis: string;
   analyses: any[];
-  matchmakingMatches: { client: ClientRow; reason: string; score: number }[];
-  isMatchmakingOpen: boolean;
-  setIsMatchmakingOpen: (open: boolean) => void;
 }
 
 function ListingAccordion({ analysis }: { analysis: any }) {
@@ -86,8 +82,7 @@ function ListingAccordion({ analysis }: { analysis: any }) {
 export function ClientSpotlight({
   selectedClient, activeProfile, onClose, vibe, suggestedTouch, logTouchDate,
   intelligenceData, isGeneratingIntelligence, generateIntelligence,
-  listingUrl, setListingUrl, submitListing, isStreaming, streamingAnalysis, analyses,
-  matchmakingMatches, isMatchmakingOpen, setIsMatchmakingOpen
+  listingUrl, setListingUrl, submitListing, isStreaming, streamingAnalysis, analyses
 }: ClientSpotlightProps) {
 
   // Synthesize behavioral anomalies from profile + metadata
@@ -345,24 +340,9 @@ export function ClientSpotlight({
                 ))}
               </div>
 
-              {analyses.length > 0 && !isStreaming && (
-                <button 
-                  onClick={() => setIsMatchmakingOpen(true)}
-                  className="w-full mt-4 flex items-center justify-center gap-2 py-3 bg-[#C8B89A]/20 text-[#C8B89A] border border-[#C8B89A]/40 text-[9px] font-bold uppercase tracking-widest hover:bg-[#C8B89A]/30 transition-all rounded-sm"
-                >
-                   <Brain className="w-3.5 h-3.5" /> Match with other clients
-                </button>
-              )}
-           </div>
+            </div>
         </div>
       </div>
-
-      <MatchmakingDrawer 
-        isOpen={isMatchmakingOpen} 
-        onClose={() => setIsMatchmakingOpen(false)} 
-        matches={matchmakingMatches}
-        listingUrl={analyses[0]?.listing_url || ''}
-      />
     </motion.div>
   );
 }

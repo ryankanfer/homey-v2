@@ -370,16 +370,16 @@ const RENT_TIMELINES = [
 ];
 
 const BUY_FEARS = [
-  { label: 'Overpaying at the top of the market', value: 'Overpaying', stats: 58 },
-  { label: 'Hidden structural or co-op board issues', value: 'Issues', stats: 24 },
-  { label: 'Moving too slowly — losing the right place', value: 'Speed', stats: 12 },
-  { label: 'Waiving contingencies I shouldn\'t', value: 'Risk', stats: 6 },
+  { label: 'Overpaying at the top of the market', value: 'Overpaying' },
+  { label: 'Hidden structural or co-op board issues', value: 'Issues' },
+  { label: 'Moving too slowly — losing the right place', value: 'Speed' },
+  { label: 'Waiving contingencies I shouldn\'t', value: 'Risk' },
 ];
 
 const RENT_FEARS = [
-  { label: 'Bidding wars on apartments I can afford', value: 'Competition', stats: 64 },
-  { label: 'Getting disqualified on income requirements', value: 'Qualification', stats: 22 },
-  { label: 'Predatory management after signing', value: 'Management', stats: 14 },
+  { label: 'Bidding wars on apartments I can afford', value: 'Competition' },
+  { label: 'Getting disqualified on income requirements', value: 'Qualification' },
+  { label: 'Predatory management after signing', value: 'Management' },
 ];
 
 const TICKER_LINES = (name: string, territory: string[], budget: string, fear: string) => [
@@ -1195,24 +1195,8 @@ export default function OnboardingPage() {
                              <span className={cn('text-sm transition-colors', isSelected ? 'text-[#C8B89A]' : 'text-[#F0EDE8]/80 group-hover:text-[#F0EDE8]')}>
                                {f.label}
                              </span>
-                             {isSelected && f.stats && (
-                               <motion.span 
-                                 initial={{ opacity: 0, x: 10 }}
-                                 animate={{ opacity: 1, x: 0 }}
-                                 className="text-[10px] font-mono text-[#C8B89A]"
-                               >
-                                 {f.stats}% of users share this
-                               </motion.span>
-                             )}
                            </div>
-                           
-                           {isSelected && f.stats && (
-                             <motion.div 
-                               initial={{ width: 0 }}
-                               animate={{ width: `${f.stats}%` }}
-                               className="absolute bottom-0 left-0 h-[1px] bg-[#C8B89A]/30"
-                             />
-                           )}
+
                          </button>
                        );
                      })}

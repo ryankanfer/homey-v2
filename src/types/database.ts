@@ -73,6 +73,43 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['renter_profiles']['Row'], 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['renter_profiles']['Insert']>;
       };
+      agent_profiles: {
+        Row: {
+          id: string;
+          user_id: string;
+          phone: string | null;
+          headshot_url: string | null;
+          license_number: string | null;
+          brokerage_name: string | null;
+          years_experience: number | null;
+          market_focus: string[];
+          bio: string | null;
+          onboarding_completed: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          phone?: string | null;
+          headshot_url?: string | null;
+          license_number?: string | null;
+          brokerage_name?: string | null;
+          years_experience?: number | null;
+          market_focus?: string[];
+          bio?: string | null;
+          onboarding_completed?: boolean;
+        };
+        Update: {
+          phone?: string | null;
+          headshot_url?: string | null;
+          license_number?: string | null;
+          brokerage_name?: string | null;
+          years_experience?: number | null;
+          market_focus?: string[];
+          bio?: string | null;
+          onboarding_completed?: boolean;
+        };
+      };
       agent_clients: {
         Row: {
           id: string;
