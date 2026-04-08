@@ -1059,7 +1059,13 @@ export default function OnboardingPage() {
                                           <div key={nName} className="flex flex-col">
                                             <div className="flex items-center gap-2 group/row relative group/parent">
                                                 <button
-                                                  onClick={() => setActiveNeighborhood(isActive ? null : nName)}
+                                                  onClick={() => {
+                                                    setActiveNeighborhood(isActive ? null : nName);
+                                                    const next = isNeighborhoodSelected
+                                                      ? (profile.territory || []).filter(x => x !== nName)
+                                                      : [...(profile.territory || []), nName];
+                                                    updateProfile({ territory: next });
+                                                  }}
                                                   className={cn(
                                                     "flex-1 text-left py-3 font-serif italic text-[17px] transition-all relative leading-tight",
                                                     isNeighborhoodSelected ? "text-[#C8B89A]" : "text-[#F0EDE8]/50 hover:text-[#F0EDE8]"
