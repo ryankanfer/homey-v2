@@ -37,6 +37,14 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const roleParam = params.get('role');
+    if (roleParam === 'agent' || roleParam === 'buyer') {
+      setSelectedRole(roleParam);
+    }
+  }, []);
+
+  useEffect(() => {
     if (isAuthenticated && role) {
       router.replace(role === 'agent' ? '/agent' : '/dashboard');
     }

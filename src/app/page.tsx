@@ -40,16 +40,25 @@ export default function SplashPage() {
           initial={{ y: 10, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.35, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-          className="z-10 flex flex-col items-center gap-3"
+          className="z-10 flex flex-col items-center gap-6 mt-4"
         >
+          <div className="flex flex-col items-center gap-3">
+            <button
+              onClick={() => router.push('/onboarding')}
+              aria-label="Get started — takes about 3 minutes"
+              className="px-12 py-5 bg-[#C8B89A] text-[#0D0D0B] font-bold text-[11px] tracking-widest uppercase hover:bg-[#E8DCC8] active:bg-[#D8C8A8] transition-colors flex items-center justify-center gap-2 cursor-pointer"
+            >
+              Get Started <ArrowRight className="w-4 h-4" />
+            </button>
+            <p className="text-[#6E6A65] text-[9px] font-bold uppercase tracking-widest">6 questions · about 3 minutes</p>
+          </div>
+          
           <button
-            onClick={() => router.push('/onboarding')}
-            aria-label="Get started — takes about 3 minutes"
-            className="px-12 py-5 bg-[#C8B89A] text-[#0D0D0B] font-bold text-[11px] tracking-widest uppercase hover:bg-[#E8DCC8] active:bg-[#D8C8A8] transition-colors flex items-center justify-center gap-2 cursor-pointer"
+            onClick={() => router.push('/auth?role=agent')}
+            className="text-[10px] text-[#A8A49E] hover:text-[#C8B89A] uppercase tracking-widest font-bold transition-all border-b border-transparent hover:border-[#C8B89A]/30 pb-0.5 mt-2"
           >
-            Get Started <ArrowRight className="w-4 h-4" />
+            Agent Sign In / Apply
           </button>
-          <p className="text-[#6E6A65] text-[9px] font-bold uppercase tracking-widest">6 questions · about 3 minutes</p>
         </motion.div>
       </div>
     </div>
