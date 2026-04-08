@@ -35,15 +35,17 @@ const GENERIC_INITIAL_MESSAGE: ChatMessage = {
 export default function DashboardPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const { profile, updateProfile, readinessScore, isSyncing } = useProfile();
+  const { profile, updateProfile, readinessScore, isSyncing, isLoaded } = useProfile();
   const supabase = useMemo(() => createClient(), []);
 
-  // Redirect new users (no mode set) to onboarding after profile sync settles
+  // Redirect new users (no mode set) to onboarding after profile sync settles.
+  // isLoaded guards against firing before localStorage hydrates (prevents false redirect
+  // in the magic-link flow where the new browser tab has no localStorage yet).
   useEffect(() => {
-    if (!isSyncing && user && !profile.mode) {
+    if (isLoaded && !isSyncing && user && !profile.mode) {
       router.replace('/onboarding');
     }
-  }, [isSyncing, user, profile.mode, router]);
+  }, [isLoaded, isSyncing, user, profile.mode, router]);
 
   // Check agent connection (gates Vault) and fetch pending connection requests
   useEffect(() => {

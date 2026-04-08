@@ -24,10 +24,12 @@ export function useProfile() {
   const supabase = useMemo(() => createClient(), []);
   const [profile, setProfile] = useState<UserProfile>(DEFAULT_USER_PROFILE);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   // 1. Initial load from LocalStorage
   useEffect(() => {
     setProfile(loadLocalProfile());
+    setIsLoaded(true);
   }, []);
 
   // 2. Sync DOWN: Pull from Supabase on Login
@@ -122,7 +124,7 @@ export function useProfile() {
       payload.budget_context = p.budgetContext;
     }
 
-    await supabase.from(table).upsert(payload);
+    await supabase.from(table).upsert(payload, { onConflict: 'user_id' });
     // Also persist fullName to the profiles table
     if (p.fullName) {
       await (supabase.from('profiles') as any).update({ full_name: p.fullName }).eq('id', userId);
@@ -152,6 +154,6 @@ export function useProfile() {
 
   const readinessScore = calculateReadiness(profile);
 
-  return { profile, updateProfile, resetProfile, readinessScore, isSyncing };
+  return { profile, updateProfile, resetProfile, readinessScore, isSyncing, isLoaded };
 }
 

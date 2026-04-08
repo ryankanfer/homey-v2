@@ -695,7 +695,9 @@ export default function OnboardingPage() {
         body: JSON.stringify(profile),
         signal: controller.signal,
       });
+      if (!res.ok) throw new Error(`profile-summary ${res.status}`);
       const { summary } = await res.json();
+      if (!summary) throw new Error('empty summary');
       updateProfile({ summary, isPartial: false });
     } catch {
       const firstName = profile.fullName?.split(' ')[0] || 'there';
@@ -1141,8 +1143,11 @@ export default function OnboardingPage() {
                                                   {nName}
                                                 </button>
                                                 
-                                                {/* Neighborhood Hover Summary */}
-                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-4 bg-[#0D0D0B] border border-[#2A2A27] opacity-0 group-hover/parent:opacity-100 pointer-events-none transition-opacity z-50 shadow-2xl">
+                                                {/* Neighborhood Hover Summary - Only show if neighborhood is clicked/active */}
+                                                <div className={cn(
+                                                  "absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-4 bg-[#0D0D0B] border border-[#2A2A27] transition-all duration-500 z-50 shadow-2xl pointer-events-none",
+                                                  isActive ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
+                                                )}>
                                                   <p className="text-[10px] leading-relaxed normal-case font-bold text-[#F0EDE8] mb-2 italic border-b border-[#2A2A27] pb-1.5">{nName}</p>
                                                   {(() => {
                                                     const stats = profile.mode === 'Rent' ? RENTER_NEIGHBORHOOD_STATS[nName] : NEIGHBORHOOD_STATS[nName];
@@ -1264,11 +1269,11 @@ export default function OnboardingPage() {
                              <span className={cn('text-sm transition-colors', isSelected ? 'text-[#C8B89A]' : 'text-[#F0EDE8]/80 group-hover:text-[#F0EDE8]')}>
                                {f.label}
                              </span>
-                             {/* Community Poll Metric */}
+                             {/* Community Poll Metric - Reveal after click */}
                              <div className="flex flex-col items-end">
                                <span className={cn(
-                                 "text-[10px] font-bold transition-opacity",
-                                 isSelected ? "opacity-100 text-[#C8B89A]" : "opacity-40 group-hover:opacity-60 text-[#F0EDE8]"
+                                 "text-[10px] font-bold transition-all duration-700",
+                                 profile.fear ? (isSelected ? "opacity-100 text-[#C8B89A]" : "opacity-40 text-[#F0EDE8]") : "opacity-0"
                                )}>
                                  {f.label === 'Overpaying at the top of the market' || f.label === 'Bidding wars on apartments I can afford' ? '38%' : 
                                   f.label === 'Hidden structural or co-op board issues' || f.label === 'Getting disqualified on income requirements' ? '24%' : '19%'}
@@ -1276,15 +1281,15 @@ export default function OnboardingPage() {
                              </div>
                            </div>
 
-                           {/* Poll Progress Bar */}
+                           {/* Poll Progress Bar - Reveal after click */}
                            <div className="mt-4 w-full h-[1px] bg-[#2A2A27] relative overflow-hidden">
                              <motion.div 
                                initial={{ width: 0 }}
-                               animate={{ width: f.label === 'Overpaying at the top of the market' || f.label === 'Bidding wars on apartments I can afford' ? '38%' : 
-                                              f.label === 'Hidden structural or co-op board issues' || f.label === 'Getting disqualified on income requirements' ? '24%' : '19%' }}
+                               animate={{ width: profile.fear ? (f.label === 'Overpaying at the top of the market' || f.label === 'Bidding wars on apartments I can afford' ? '38%' : 
+                                              f.label === 'Hidden structural or co-op board issues' || f.label === 'Getting disqualified on income requirements' ? '24%' : '19%') : 0 }}
                                className={cn(
-                                 "absolute h-full transition-colors",
-                                 isSelected ? "bg-[#C8B89A]" : "bg-[#6E6A65]"
+                                 "absolute h-full transition-colors duration-700",
+                                 isSelected ? "bg-[#C8B89A]" : "bg-[#6E6A65]/30"
                                )}
                              />
                            </div>
